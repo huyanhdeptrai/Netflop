@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #141414;
+  --color-surface: #1F1F1F;
+  --color-primary: #E5097F;
+  --color-primary-hover: #FF2A7A;
+  --color-text-main: #FFFFFF;
+  --color-text-muted: #B3B3B3;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main font-sans antialiased;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-background/85 backdrop-blur-xl border-b border-white/5;
+  }
+  
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white font-bold py-2 px-6 rounded-lg transition-all duration-300;
+  }
+
+  .btn-secondary {
+    @apply bg-[#2B2B2B] hover:text-primary border border-transparent hover:border-primary text-white font-medium py-2 px-6 rounded-lg transition-all duration-300;
+  }
+}
+
+@keyframes pulse-scale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Skeleton animation */
+@keyframes pulse-bg {
+  0% { background-color: #1F1F1F; }
+  50% { background-color: #2B2B2B; }
+  100% { background-color: #1F1F1F; }
+}
+
+.skeleton {
+  animation: pulse-bg 1.5s ease-in-out infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(229, 9, 127, 0.5);
+}
+
+/* Scrollbar Hide Utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
