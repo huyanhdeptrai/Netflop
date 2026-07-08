@@ -48,8 +48,20 @@ export interface MovieDetail extends Movie {
 }
 
 export const getImageUrl = (url: string) => {
-  if (url.startsWith('http')) return `https://phimapi.com/image.php?url=${encodeURIComponent(url)}`;
-  return `https://phimimg.com/${url}`;
+  if (!url) return '';
+  
+  // If it's a relative path, prepend the KKPhim optimized CDN domain
+  if (!url.startsWith('http')) {
+    return `https://images.kkphim.com/${url}`;
+  }
+  
+  // If it's an absolute path, replace phimimg.com with images.kkphim.com to ensure high speed and bypass blocks
+  let cleanUrl = url;
+  if (cleanUrl.includes('phimimg.com')) {
+    cleanUrl = cleanUrl.replace('phimimg.com', 'images.kkphim.com');
+  }
+  
+  return cleanUrl;
 };
 
 export const fetchMovies = async (page = 1) => {
@@ -76,3 +88,60 @@ export const fetchGenreMovies = async (genre: string, page = 1) => {
   const res = await fetch(`${API_BASE_URL}/v1/api/the-loai/${genre}?page=${page}`);
   return res.json();
 };
+
+export const fetchCountryMovies = async (country: string, page = 1) => {
+  const res = await fetch(`${API_BASE_URL}/v1/api/quoc-gia/${country}?page=${page}`);
+  return res.json();
+};
+
+export const GENRES = [
+  { slug: 'hanh-dong', name: 'Hành Động' },
+  { slug: 'co-trang', name: 'Cổ Trang' },
+  { slug: 'chien-tranh', name: 'Chiến Tranh' },
+  { slug: 'vien-tuong', name: 'Viễn Tưởng' },
+  { slug: 'kinh-di', name: 'Kinh Dị' },
+  { slug: 'tai-lieu', name: 'Tài Liệu' },
+  { slug: 'tam-ly', name: 'Tâm Lý' },
+  { slug: 'tinh-cam', name: 'Tình Cảm' },
+  { slug: 'hinh-su', name: 'Hình Sự' },
+  { slug: 'vo-thuat', name: 'Võ Thuật' },
+  { slug: 'hai-huoc', name: 'Hài Hước' },
+  { slug: 'phieu-luu', name: 'Phiêu Lưu' },
+  { slug: 'khoa-hoc', name: 'Khoa Học' },
+  { slug: 'am-nhac', name: 'Âm Nhạc' },
+  { slug: 'than-thoai', name: 'Thần Thoại' },
+  { slug: 'gia-dinh', name: 'Gia Đình' },
+  { slug: 'chinh-kich', name: 'Chính Kịch' },
+  { slug: 'hoc-duong', name: 'Học Đường' },
+  { slug: 'the-thao', name: 'Thể Thao' },
+  { slug: 'bi-an', name: 'Bí Ẩn' },
+  { slug: 'kinh-dien', name: 'Kinh Điển' }
+];
+
+export const COUNTRIES = [
+  { slug: 'trung-quoc', name: 'Trung Quốc' },
+  { slug: 'han-quoc', name: 'Hàn Quốc' },
+  { slug: 'nhat-ban', name: 'Nhật Bản' },
+  { slug: 'my', name: 'Mỹ' },
+  { slug: 'viet-nam', name: 'Việt Nam' },
+  { slug: 'thai-lan', name: 'Thái Lan' },
+  { slug: 'hong-kong', name: 'Hồng Kông' },
+  { slug: 'dai-loan', name: 'Đài Loan' },
+  { slug: 'an-do', name: 'Ấn Độ' },
+  { slug: 'anh', name: 'Anh' },
+  { slug: 'phap', name: 'Pháp' },
+  { slug: 'canada', name: 'Canada' },
+  { slug: 'duc', name: 'Đức' },
+  { slug: 'tay-ban-nha', name: 'Tây Ban Nha' },
+  { slug: 'tho-nhi-ky', name: 'Thổ Nhĩ Kỳ' },
+  { slug: 'ha-lan', name: 'Hà Lan' },
+  { slug: 'indonesia', name: 'Indonesia' },
+  { slug: 'nga', name: 'Nga' },
+  { slug: 'mexico', name: 'Mexico' },
+  { slug: 'ba-lan', name: 'Ba Lan' },
+  { slug: 'uc', name: 'Úc' },
+  { slug: 'thuy-dien', name: 'Thụy Điển' },
+  { slug: 'thuy-si', name: 'Thụy Sĩ' },
+  { slug: 'brazil', name: 'Brazil' },
+  { slug: 'philippines', name: 'Philippines' }
+];

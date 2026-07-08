@@ -168,7 +168,16 @@ export default function MovieDetails() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Globe size={18} />
-                <span>{movie.country?.[0]?.name}</span>
+                {movie.country?.[0] ? (
+                  <Link 
+                    to={`/category/${movie.country[0].slug}`} 
+                    className="hover:text-primary transition-colors hover:underline"
+                  >
+                    {movie.country[0].name}
+                  </Link>
+                ) : (
+                  <span>Đang cập nhật</span>
+                )}
               </div>
             </div>
 
@@ -240,7 +249,37 @@ export default function MovieDetails() {
                 </div>
                 <div>
                   <span className="text-text-muted">Thể loại: </span>
-                  <span className="text-white">{movie.category?.map(c => c.name).join(', ')}</span>
+                  <span className="text-white flex flex-wrap gap-x-2 gap-y-1 inline-flex items-center">
+                    {movie.category && movie.category.length > 0 ? (
+                      movie.category.map((c, i) => (
+                        <React.Fragment key={c.id || c.slug || i}>
+                          <Link to={`/category/${c.slug}`} className="hover:text-primary transition-colors hover:underline text-white font-medium">
+                            {c.name}
+                          </Link>
+                          {i < (movie.category?.length || 0) - 1 && <span className="text-text-muted/60">,</span>}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <span>Đang cập nhật</span>
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-text-muted">Quốc gia: </span>
+                  <span className="text-white flex flex-wrap gap-x-2 gap-y-1 inline-flex items-center">
+                    {movie.country && movie.country.length > 0 ? (
+                      movie.country.map((c, i) => (
+                        <React.Fragment key={c.id || c.slug || i}>
+                          <Link to={`/category/${c.slug}`} className="hover:text-primary transition-colors hover:underline text-white font-medium">
+                            {c.name}
+                          </Link>
+                          {i < (movie.country?.length || 0) - 1 && <span className="text-text-muted/60">,</span>}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <span>Đang cập nhật</span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

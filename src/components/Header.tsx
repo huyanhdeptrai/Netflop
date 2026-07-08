@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight } from 'lucide-react';
-import { cn, searchMovies, Movie, getImageUrl } from '../services/api';
+import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight, Tv } from 'lucide-react';
+import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function Header() {
+interface HeaderProps {
+  onEnterTvMode?: () => void;
+}
+
+export default function Header({ onEnterTvMode }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -13,6 +17,8 @@ export default function Header() {
   const [liveResults, setLiveResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isMobileGenresOpen, setIsMobileGenresOpen] = useState(false);
+  const [isMobileCountriesOpen, setIsMobileCountriesOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { history, removeFromHistory } = useHistory();
@@ -101,6 +107,49 @@ export default function Header() {
             <Link to="/category/phim-bo" className="hover:text-primary transition-colors">Phim bộ</Link>
             <Link to="/category/phim-le" className="hover:text-primary transition-colors">Phim lẻ</Link>
             <Link to="/category/hoat-hinh" className="hover:text-primary transition-colors">Hoạt hình</Link>
+            <Link to="/category/tv-shows" className="hover:text-primary transition-colors">TV Shows</Link>
+            
+            {/* Thể loại Dropdown */}
+            <div className="relative group py-5 cursor-pointer">
+              <span className="hover:text-primary transition-colors flex items-center gap-1">
+                Thể loại
+                <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </span>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 bg-[#1A1A1A] border border-white/10 rounded-2xl p-4 shadow-2xl hidden group-hover:block w-[450px] z-50">
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {GENRES.map(genre => (
+                    <Link
+                      key={genre.slug}
+                      to={`/category/${genre.slug}`}
+                      className="p-2 hover:bg-white/5 rounded-lg transition-colors hover:text-primary"
+                    >
+                      {genre.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Quốc gia Dropdown */}
+            <div className="relative group py-5 cursor-pointer">
+              <span className="hover:text-primary transition-colors flex items-center gap-1">
+                Quốc gia
+                <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </span>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 bg-[#1A1A1A] border border-white/10 rounded-2xl p-4 shadow-2xl hidden group-hover:block w-[320px] z-50">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {COUNTRIES.map(country => (
+                    <Link
+                      key={country.slug}
+                      to={`/category/${country.slug}`}
+                      className="p-2 hover:bg-white/5 rounded-lg transition-colors hover:text-primary"
+                    >
+                      {country.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
           </nav>
         </div>
 
@@ -272,6 +321,8 @@ export default function Header() {
             <User size={20} />
           </Link>
 
+
+
           <button 
             className="md:hidden p-2 hover:text-primary transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -425,40 +476,123 @@ export default function Header() {
                     Hoạt hình
                     <ChevronRight size={16} className="opacity-50" />
                   </Link>
+                  <Link 
+                    to="/category/tv-shows" 
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-xl font-bold transition-all",
+                      location.pathname === '/category/tv-shows' ? "bg-primary/10 text-primary" : "text-text-muted hover:bg-white/5 hover:text-white"
+                    )}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    TV Shows
+                    <ChevronRight size={16} className="opacity-50" />
+                  </Link>
+
+                  {/* Mobile Thể loại Accordion */}
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setIsMobileGenresOpen(!isMobileGenresOpen)}
+                      className="w-full flex items-center justify-between p-3 rounded-xl font-bold transition-all text-text-muted hover:bg-white/5 hover:text-white"
+                    >
+                      <span>Thể loại</span>
+                      <ChevronRight size={16} className={cn("transition-transform duration-300 opacity-50", isMobileGenresOpen && "rotate-90")} />
+                    </button>
+                    <AnimatePresence>
+                      {isMobileGenresOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden bg-black/20 rounded-xl pl-3"
+                        >
+                          <div className="grid grid-cols-2 gap-1 p-2 text-xs">
+                            {GENRES.map(genre => (
+                              <Link
+                                key={genre.slug}
+                                to={`/category/${genre.slug}`}
+                                className="p-2 text-text-muted hover:text-primary transition-colors text-left"
+                                onClick={() => setIsMenuOpen(false)}
+                              >
+                                {genre.name}
+                              </Link>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Mobile Quốc gia Accordion */}
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setIsMobileCountriesOpen(!isMobileCountriesOpen)}
+                      className="w-full flex items-center justify-between p-3 rounded-xl font-bold transition-all text-text-muted hover:bg-white/5 hover:text-white"
+                    >
+                      <span>Quốc gia</span>
+                      <ChevronRight size={16} className={cn("transition-transform duration-300 opacity-50", isMobileCountriesOpen && "rotate-90")} />
+                    </button>
+                    <AnimatePresence>
+                      {isMobileCountriesOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden bg-black/20 rounded-xl pl-3"
+                        >
+                          <div className="grid grid-cols-2 gap-1 p-2 text-xs">
+                            {COUNTRIES.map(country => (
+                              <Link
+                                key={country.slug}
+                                to={`/category/${country.slug}`}
+                                className="p-2 text-text-muted hover:text-primary transition-colors text-left"
+                                onClick={() => setIsMenuOpen(false)}
+                              >
+                                {country.name}
+                              </Link>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </nav>
               </div>
 
-              <div className="p-4 border-t border-white/5 grid grid-cols-3 gap-2 bg-[#1F1F1F]">
-                <Link 
-                  to="/favorites" 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <Heart size={20} />
-                  </div>
-                  <span className="text-[10px] font-bold">Yêu thích</span>
-                </Link>
-                <Link 
-                  to="/resume" 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <History size={20} />
-                  </div>
-                  <span className="text-[10px] font-bold">Lịch sử</span>
-                </Link>
-                <Link 
-                  to="/account"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <User size={20} />
-                  </div>
-                  <span className="text-[10px] font-bold">Cá nhân</span>
-                </Link>
+              <div className="p-4 border-t border-white/5 bg-[#1F1F1F] space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <Link 
+                    to="/favorites" 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <Heart size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold">Yêu thích</span>
+                  </Link>
+                  <Link 
+                    to="/resume" 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <History size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold">Lịch sử</span>
+                  </Link>
+                  <Link 
+                    to="/account"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <User size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold">Cá nhân</span>
+                  </Link>
+                </div>
+
+
               </div>
             </motion.div>
           </>
