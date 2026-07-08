@@ -18,15 +18,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash;
     if (params.get('tv') === 'true' || params.get('tv') === '1' || params.get('mode') === 'tv' || hash.includes('tv')) {
-      localStorage.setItem('tvMode', 'true');
       return true;
     }
 
-    // 2. Check local storage
-    const stored = localStorage.getItem('tvMode');
-    if (stored) return stored === 'true';
-
-    // 3. Ultra-comprehensive Auto-detect TV via User Agent
+    // 2. Ultra-comprehensive Auto-detect TV via User Agent
     const ua = navigator.userAgent.toLowerCase();
     const tvKeywords = [
       'smarttv', 'smart-tv', 'smart_tv', 'googletv', 'androidtv', 'android-tv',
@@ -43,12 +38,20 @@ export default function App() {
                  (ua.includes('tv') && (ua.includes('linux') || ua.includes('safari') || ua.includes('chrome'))) && 
                  !ua.includes('mobile') && !ua.includes('tablet') && !ua.includes('iphone') && !ua.includes('ipad') && !ua.includes('android');
 
+    if (!isTv) {
+      localStorage.removeItem('tvMode');
+    }
+
     return isTv;
   });
 
   const handleSetTvMode = (mode: boolean) => {
     setTvMode(mode);
-    localStorage.setItem('tvMode', String(mode));
+    if (mode) {
+      localStorage.setItem('tvMode', 'true');
+    } else {
+      localStorage.removeItem('tvMode');
+    }
   };
 
   if (tvMode) {

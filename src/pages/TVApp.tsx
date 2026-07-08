@@ -1,23 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, Film, Tv, Heart, LogOut, Play, Star, Calendar, Clock, Globe, ArrowLeft, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, Movie, MovieDetail } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies } from '../services/api';
+import { useHistory } from '../services/HistoryContext';
 
 interface TVAppProps {
   setTvMode: (mode: boolean) => void;
 }
 
-type Section = 'sidebar' | 'shelves' | 'detail_modal' | 'player' | 'search';
+interface TVShelf {
+  title: string;
+  movies: any[];
+  isHistory?: boolean;
+}
+
+type Section = 'sidebar' | 'shelves' | 'detail_modal' | 'player' | 'search' | 'genres_grid' | 'countries_grid';
+
+const VIRTUAL_KEYBOARD = [
+  'A', 'B', 'C', 'D', 'E', 'F',
+  'G', 'H', 'I', 'J', 'K', 'L',
+  'M', 'N', 'O', 'P', 'Q', 'R',
+  'S', 'T', 'U', 'V', 'W', 'X',
+  'Y', 'Z', '1', '2', '3', '4',
+  '5', '6', '7', '8', '9', '0',
+  'SPACE', 'BACK', 'CLEAR'
+];
 
 export default function TVApp({ setTvMode }: TVAppProps) {
   // Navigation State
   const [currentSection, setCurrentSection] = useState<Section>('shelves');
-  const [sidebarIndex, setSidebarIndex] = useState(1); // 0: Search, 1: Home, 2: Series, 3: Movies, 4: Anime, 5: Favorites, 6: Exit
+  const [sidebarIndex, setSidebarIndex] = useState(1); // 0: Search, 1: Home, 2: Series, 3: Movies, 4: Anime, 5: Genres, 6: Countries, 7: Favorites, 8: Exit
   const [activeShelf, setActiveShelf] = useState(0);
   const [activeMovieIdx, setActiveMovieIdx] = useState(0);
   
   // Movie Lists
-  const [shelvesData, setShelvesData] = useState<{ title: string; movies: Movie[] }[]>([]);
+  const [shelvesData, setShelvesData] = useState<TVShelf[]>([]);
   const [loading, setLoading] = useState(true);
   const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
 
@@ -28,7 +45,13 @@ export default function TVApp({ setTvMode }: TVAppProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFocusedArea, setSearchFocusedArea] = useState<'keyboard' | 'results'>('keyboard');
+  const [keyboardFocusedIdx, setKeyboardFocusedIdx] = useState(0);
   const [searchFocusedIdx, setSearchFocusedIdx] = useState(0);
+
+  // Genres & Countries grid states
+  const [genresFocusedIdx, setGenresFocusedIdx] = useState(0);
+  const [countriesFocusedIdx, setCountriesFocusedIdx] = useState(0);
 
   // Detail Modal State
   const [selectedMovie, setSelectedMovie] = useState<MovieDetail | null>(null);
@@ -41,11 +64,14 @@ export default function TVApp({ setTvMode }: TVAppProps) {
   const [activePlayerUrl, setActivePlayerUrl] = useState<string | null>(null);
   const [activeEpisodeName, setActiveEpisodeName] = useState<string>('');
 
+  // History Context
+  const { history, updateHistory } = useHistory();
+
   // Refs for auto-scrolling shelves
   const shelfRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Category filters
-  const [currentCategoryFilter, setCurrentCategoryFilter] = useState<string>('home'); // 'home', 'phim-bo', 'phim-le', 'hoat-hinh', 'favorites'
+  const [currentCategoryFilter, setCurrentCategoryFilter] = useState<string>('home'); // 'home', 'phim-bo', 'phim-le', 'hoat-hinh', 'favorites', etc.
 
   // Load Initial Data
   useEffect(() => {
@@ -90,12 +116,23 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     }
   }, []);
 
+  // Compute visible shelves, including watch history if on home page
+  const visibleShelves = React.useMemo(() => {
+    if (currentCategoryFilter === 'home' && history && history.length > 0) {
+      return [
+        { title: 'Tiếp Tục Xem 🕒', movies: history, isHistory: true },
+        ...shelvesData
+      ];
+    }
+    return shelvesData;
+  }, [currentCategoryFilter, shelvesData, history]);
+
   // Update Hero Movie when active movie changes on the shelves
   useEffect(() => {
-    if (currentSection === 'shelves' && shelvesData[activeShelf]?.movies[activeMovieIdx]) {
-      setHeroMovie(shelvesData[activeShelf].movies[activeMovieIdx]);
+    if (currentSection === 'shelves' && visibleShelves[activeShelf]?.movies[activeMovieIdx]) {
+      setHeroMovie(visibleShelves[activeShelf].movies[activeMovieIdx]);
     }
-  }, [activeShelf, activeMovieIdx, currentSection, shelvesData]);
+  }, [activeShelf, activeMovieIdx, currentSection, visibleShelves]);
 
   // Handle Search Input changes
   useEffect(() => {
@@ -106,9 +143,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     const delayDebounce = setTimeout(async () => {
       setSearchLoading(true);
       try {
-        const res = await fetch(`https://phimapi.com/v1/api/tim-kiem?keyword=${encodeURIComponent(searchQuery)}&limit=12`);
-        const data = await res.json();
-        setSearchResults(data.data?.items || []);
+        const res = await searchMovies(searchQuery, 1);
+        setSearchResults(res.data?.items || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -136,6 +172,35 @@ export default function TVApp({ setTvMode }: TVAppProps) {
       }
     }
   }, [activeMovieIdx, activeShelf, currentSection]);
+
+  // Scroll focused elements in grids & modal
+  useEffect(() => {
+    if (currentSection === 'genres_grid') {
+      const activeEl = document.getElementById(`tv-genre-${genresFocusedIdx}`);
+      activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [genresFocusedIdx, currentSection]);
+
+  useEffect(() => {
+    if (currentSection === 'countries_grid') {
+      const activeEl = document.getElementById(`tv-country-${countriesFocusedIdx}`);
+      activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [countriesFocusedIdx, currentSection]);
+
+  useEffect(() => {
+    if (currentSection === 'search' && searchFocusedArea === 'results') {
+      const activeEl = document.getElementById(`tv-search-result-${searchFocusedIdx}`);
+      activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [searchFocusedIdx, searchFocusedArea, currentSection]);
+
+  useEffect(() => {
+    if (currentSection === 'detail_modal' && modalFocus === 'episodes') {
+      const activeEl = document.getElementById(`tv-episode-${focusedEpisodeIdx}`);
+      activeEl?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [focusedEpisodeIdx, modalFocus, currentSection]);
 
   // Toggle Favorite
   const toggleFavorite = (movie: Movie) => {
@@ -172,6 +237,19 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     }
   };
 
+  const handleVirtualKeyPress = (key: string) => {
+    if (key === 'SPACE') {
+      setSearchQuery(prev => prev + ' ');
+    } else if (key === 'BACK') {
+      setSearchQuery(prev => prev.slice(0, -1));
+    } else if (key === 'CLEAR') {
+      setSearchQuery('');
+    } else {
+      setSearchQuery(prev => prev + key);
+    }
+    setSearchFocusedIdx(0);
+  };
+
   // Keyboard / Remote D-Pad Navigation Engine
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,13 +264,17 @@ export default function TVApp({ setTvMode }: TVAppProps) {
             if (sidebarIndex > 0) setSidebarIndex(prev => prev - 1);
             break;
           case 'ArrowDown':
-            if (sidebarIndex < 6) setSidebarIndex(prev => prev + 1);
+            if (sidebarIndex < 7) setSidebarIndex(prev => prev + 1);
             break;
           case 'ArrowRight':
-            // Switch back to shelves or search depending on sidebar position
             if (sidebarIndex === 0) {
               setCurrentSection('search');
-            } else if (sidebarIndex === 5 && favorites.length === 0) {
+              setSearchFocusedArea('keyboard');
+            } else if (sidebarIndex === 5) {
+              setCurrentSection('genres_grid');
+            } else if (sidebarIndex === 6) {
+              setCurrentSection('countries_grid');
+            } else if (sidebarIndex === 7 && favorites.length === 0) {
               // Stay in sidebar if no favorites
             } else {
               setCurrentSection('shelves');
@@ -209,13 +291,12 @@ export default function TVApp({ setTvMode }: TVAppProps) {
       }
 
       else if (currentSection === 'shelves') {
-        const currentShelfMovies = shelvesData[activeShelf]?.movies || [];
+        const currentShelfMovies = visibleShelves[activeShelf]?.movies || [];
         switch (e.key) {
           case 'ArrowLeft':
             if (activeMovieIdx > 0) {
               setActiveMovieIdx(prev => prev - 1);
             } else {
-              // Move focus to sidebar
               setCurrentSection('sidebar');
             }
             break;
@@ -227,17 +308,16 @@ export default function TVApp({ setTvMode }: TVAppProps) {
           case 'ArrowUp':
             if (activeShelf > 0) {
               setActiveShelf(prev => prev - 1);
-              // Safe-guard index
-              const nextShelfMovies = shelvesData[activeShelf - 1]?.movies || [];
+              const nextShelfMovies = visibleShelves[activeShelf - 1]?.movies || [];
               if (activeMovieIdx >= nextShelfMovies.length) {
                 setActiveMovieIdx(Math.max(0, nextShelfMovies.length - 1));
               }
             }
             break;
           case 'ArrowDown':
-            if (activeShelf < shelvesData.length - 1) {
+            if (activeShelf < visibleShelves.length - 1) {
               setActiveShelf(prev => prev + 1);
-              const nextShelfMovies = shelvesData[activeShelf + 1]?.movies || [];
+              const nextShelfMovies = visibleShelves[activeShelf + 1]?.movies || [];
               if (activeMovieIdx >= nextShelfMovies.length) {
                 setActiveMovieIdx(Math.max(0, nextShelfMovies.length - 1));
               }
@@ -253,66 +333,163 @@ export default function TVApp({ setTvMode }: TVAppProps) {
       }
 
       else if (currentSection === 'search') {
-        const inputEl = document.getElementById('tv-search-input');
-        switch (e.key) {
-          case 'ArrowLeft':
-            if (document.activeElement === inputEl) {
-              setCurrentSection('sidebar');
-              setSidebarIndex(0);
-            } else {
-              if (searchFocusedIdx % 4 === 0) {
-                // Focus back to input
-                inputEl?.focus();
+        if (searchFocusedArea === 'keyboard') {
+          switch (e.key) {
+            case 'ArrowLeft':
+              if (keyboardFocusedIdx % 6 === 0) {
+                setCurrentSection('sidebar');
+                setSidebarIndex(0);
+              } else {
+                setKeyboardFocusedIdx(prev => Math.max(0, prev - 1));
+              }
+              break;
+            case 'ArrowRight':
+              if (keyboardFocusedIdx % 6 === 5) {
+                if (searchResults.length > 0) {
+                  setSearchFocusedArea('results');
+                  setSearchFocusedIdx(0);
+                }
+              } else {
+                if (keyboardFocusedIdx < VIRTUAL_KEYBOARD.length - 1) {
+                  setKeyboardFocusedIdx(prev => prev + 1);
+                }
+              }
+              break;
+            case 'ArrowDown':
+              if (keyboardFocusedIdx + 6 < VIRTUAL_KEYBOARD.length) {
+                setKeyboardFocusedIdx(prev => prev + 6);
+              }
+              break;
+            case 'ArrowUp':
+              if (keyboardFocusedIdx - 6 >= 0) {
+                setKeyboardFocusedIdx(prev => prev - 6);
+              }
+              break;
+            case 'Enter':
+              const key = VIRTUAL_KEYBOARD[keyboardFocusedIdx];
+              if (key) {
+                handleVirtualKeyPress(key);
+              }
+              break;
+            case 'Backspace':
+            case 'Escape':
+              setCurrentSection('shelves');
+              break;
+          }
+        } else if (searchFocusedArea === 'results') {
+          const numCols = 3;
+          switch (e.key) {
+            case 'ArrowLeft':
+              if (searchFocusedIdx % numCols === 0) {
+                setSearchFocusedArea('keyboard');
+                setKeyboardFocusedIdx(11); // Focus near 'L' key
               } else {
                 setSearchFocusedIdx(prev => Math.max(0, prev - 1));
               }
-            }
-            break;
-          case 'ArrowRight':
-            if (document.activeElement === inputEl) {
-              if (searchResults.length > 0) {
-                inputEl.blur();
-                setSearchFocusedIdx(0);
-              }
-            } else {
+              break;
+            case 'ArrowRight':
               if (searchFocusedIdx < searchResults.length - 1) {
                 setSearchFocusedIdx(prev => prev + 1);
               }
+              break;
+            case 'ArrowDown':
+              if (searchFocusedIdx + numCols < searchResults.length) {
+                setSearchFocusedIdx(prev => prev + numCols);
+              }
+              break;
+            case 'ArrowUp':
+              if (searchFocusedIdx - numCols >= 0) {
+                setSearchFocusedIdx(prev => prev - numCols);
+              }
+              break;
+            case 'Enter':
+              const focusedMovie = searchResults[searchFocusedIdx];
+              if (focusedMovie) {
+                openMovieDetails(focusedMovie.slug);
+              }
+              break;
+            case 'Backspace':
+            case 'Escape':
+              setSearchFocusedArea('keyboard');
+              break;
+          }
+        }
+      }
+
+      else if (currentSection === 'genres_grid') {
+        switch (e.key) {
+          case 'ArrowLeft':
+            if (genresFocusedIdx % 4 === 0) {
+              setCurrentSection('sidebar');
+              setSidebarIndex(5);
+            } else {
+              setGenresFocusedIdx(prev => Math.max(0, prev - 1));
             }
             break;
-          case 'ArrowDown':
-            if (document.activeElement === inputEl) {
-              if (searchResults.length > 0) {
-                inputEl.blur();
-                setSearchFocusedIdx(0);
-              }
-            } else {
-              if (searchFocusedIdx + 4 < searchResults.length) {
-                setSearchFocusedIdx(prev => prev + 4);
-              }
+          case 'ArrowRight':
+            if ((genresFocusedIdx + 1) % 4 !== 0 && genresFocusedIdx < GENRES.length - 1) {
+              setGenresFocusedIdx(prev => prev + 1);
             }
             break;
           case 'ArrowUp':
-            if (document.activeElement !== inputEl) {
-              if (searchFocusedIdx - 4 >= 0) {
-                setSearchFocusedIdx(prev => prev - 4);
-              } else {
-                inputEl?.focus();
-              }
+            if (genresFocusedIdx >= 4) {
+              setGenresFocusedIdx(prev => prev - 4);
+            }
+            break;
+          case 'ArrowDown':
+            if (genresFocusedIdx + 4 < GENRES.length) {
+              setGenresFocusedIdx(prev => prev + 4);
             }
             break;
           case 'Enter':
-            if (document.activeElement !== inputEl && searchResults[searchFocusedIdx]) {
-              openMovieDetails(searchResults[searchFocusedIdx].slug);
+            const g = GENRES[genresFocusedIdx];
+            if (g) {
+              handleGenreSelect(g.slug, g.name);
             }
             break;
           case 'Backspace':
           case 'Escape':
-            if (document.activeElement === inputEl) {
-              inputEl.blur();
+            setCurrentSection('sidebar');
+            setSidebarIndex(5);
+            break;
+        }
+      }
+
+      else if (currentSection === 'countries_grid') {
+        switch (e.key) {
+          case 'ArrowLeft':
+            if (countriesFocusedIdx % 4 === 0) {
+              setCurrentSection('sidebar');
+              setSidebarIndex(6);
             } else {
-              setCurrentSection('shelves');
+              setCountriesFocusedIdx(prev => Math.max(0, prev - 1));
             }
+            break;
+          case 'ArrowRight':
+            if ((countriesFocusedIdx + 1) % 4 !== 0 && countriesFocusedIdx < COUNTRIES.length - 1) {
+              setCountriesFocusedIdx(prev => prev + 1);
+            }
+            break;
+          case 'ArrowUp':
+            if (countriesFocusedIdx >= 4) {
+              setCountriesFocusedIdx(prev => prev - 4);
+            }
+            break;
+          case 'ArrowDown':
+            if (countriesFocusedIdx + 4 < COUNTRIES.length) {
+              setCountriesFocusedIdx(prev => prev + 4);
+            }
+            break;
+          case 'Enter':
+            const c = COUNTRIES[countriesFocusedIdx];
+            if (c) {
+              handleCountrySelect(c.slug, c.name);
+            }
+            break;
+          case 'Backspace':
+          case 'Escape':
+            setCurrentSection('sidebar');
+            setSidebarIndex(6);
             break;
         }
       }
@@ -365,11 +542,10 @@ export default function TVApp({ setTvMode }: TVAppProps) {
             break;
           case 'Enter':
             if (modalFocus === 'play') {
-              // Play first episode
               if (episodes.length > 0) {
                 playEpisode(episodes[0].link_embed, episodes[0].name);
               } else {
-                alert('Phim chưa có tập phát sóng bro ơi!');
+                alert('Phim chưa có tập phát sóng!');
               }
             } else if (modalFocus === 'favorite') {
               toggleFavorite(selectedMovie);
@@ -406,11 +582,15 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     sidebarIndex,
     activeShelf,
     activeMovieIdx,
-    shelvesData,
+    visibleShelves,
     favorites,
     searchQuery,
     searchResults,
     searchFocusedIdx,
+    searchFocusedArea,
+    keyboardFocusedIdx,
+    genresFocusedIdx,
+    countriesFocusedIdx,
     selectedMovie,
     selectedServerIdx,
     modalFocus,
@@ -464,7 +644,15 @@ export default function TVApp({ setTvMode }: TVAppProps) {
           { title: 'Anime Vietsub Mới 🍭', movies: hoatHinh.data?.items?.slice(5, 20) || [] },
         ]);
         setCurrentSection('shelves');
-      } else if (idx === 5) { // Favorites
+      } else if (idx === 5) { // Thể Loại (Genres grid)
+        setCurrentSection('genres_grid');
+        setGenresFocusedIdx(0);
+        setLoading(false);
+      } else if (idx === 6) { // Quốc Gia (Countries grid)
+        setCurrentSection('countries_grid');
+        setCountriesFocusedIdx(0);
+        setLoading(false);
+      } else if (idx === 7) { // Favorites
         setCurrentCategoryFilter('favorites');
         setShelvesData([
           { title: 'Phim Bạn Đã Lưu Yêu Thích ❤️', movies: favorites },
@@ -474,13 +662,58 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         } else {
           setCurrentSection('sidebar');
         }
-      } else if (idx === 6) { // Exit
-        setTvMode(false);
       } else if (idx === 0) { // Search
         setCurrentSection('search');
-        setTimeout(() => {
-          document.getElementById('tv-search-input')?.focus();
-        }, 100);
+        setSearchFocusedArea('keyboard');
+        setKeyboardFocusedIdx(0);
+        setSearchFocusedIdx(0);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenreSelect = async (genreSlug: string, genreName: string) => {
+    setLoading(true);
+    setCurrentSection('shelves');
+    setCurrentCategoryFilter(`genre-${genreSlug}`);
+    setActiveShelf(0);
+    setActiveMovieIdx(0);
+    try {
+      const res = await fetchGenreMovies(genreSlug, 1);
+      const movies = res.data?.items || [];
+      setShelvesData([
+        { title: `Phim ${genreName} Mới Nhất 🎬`, movies: movies.slice(0, 15) },
+        { title: `Phim ${genreName} Đề Cử ⭐`, movies: movies.slice(5, 20) },
+      ]);
+      if (movies.length > 0) {
+        setHeroMovie(movies[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCountrySelect = async (countrySlug: string, countryName: string) => {
+    setLoading(true);
+    setCurrentSection('shelves');
+    setCurrentCategoryFilter(`country-${countrySlug}`);
+    setActiveShelf(0);
+    setActiveMovieIdx(0);
+    try {
+      const res = await fetchCountryMovies(countrySlug, 1);
+      const movies = res.data?.items || [];
+      setShelvesData([
+        { title: `Điện Ảnh ${countryName} Nổi Bật 🌏`, movies: movies.slice(0, 15) },
+        { title: `Phim ${countryName} Chọn Lọc 🍿`, movies: movies.slice(5, 20) },
+      ]);
+      if (movies.length > 0) {
+        setHeroMovie(movies[0]);
       }
     } catch (err) {
       console.error(err);
@@ -493,6 +726,27 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     setActivePlayerUrl(embedUrl);
     setActiveEpisodeName(epName);
     setCurrentSection('player');
+
+    if (selectedMovie) {
+      updateHistory({
+        _id: selectedMovie._id,
+        name: selectedMovie.name,
+        slug: selectedMovie.slug,
+        origin_name: selectedMovie.origin_name,
+        poster_url: selectedMovie.poster_url,
+        thumb_url: selectedMovie.thumb_url || '',
+        year: selectedMovie.year,
+        modified: selectedMovie.modified,
+        currentTime: 10,
+        duration: 100,
+        progress: 35, // default starter progress for history row
+        lastUpdated: Date.now(),
+        episodeName: epName,
+        episodeSlug: epName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        isSeries: selectedMovie.type === 'series',
+        episodes: selectedMovie.episodes,
+      });
+    }
   };
 
   // Helper to highlight sidebar item selection
@@ -502,12 +756,13 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     { icon: Film, label: 'Phim Bộ' },
     { icon: Film, label: 'Phim Lẻ' },
     { icon: Tv, label: 'Hoạt Hình' },
+    { icon: Film, label: 'Thể Loại' },
+    { icon: Globe, label: 'Quốc Gia' },
     { icon: Heart, label: 'Yêu Thích' },
-    { icon: LogOut, label: 'Thoát TV Mode' },
   ];
 
   return (
-    <div className="bg-[#121212] min-h-screen text-white font-sans overflow-hidden select-none relative">
+    <div className="bg-[#0a0a0a] min-h-screen text-white font-sans overflow-hidden select-none relative">
       {/* Background Poster Trailer Blur Background */}
       <div className="absolute top-0 right-0 w-[80vw] h-[75vh] opacity-25 pointer-events-none transition-all duration-1000">
         {heroMovie && (
@@ -515,10 +770,10 @@ export default function TVApp({ setTvMode }: TVAppProps) {
             <img
               src={getImageUrl(heroMovie.poster_url)}
               alt=""
-              className="w-full h-full object-cover blur-2xl"
+              className="w-full h-full object-cover blur-2xl animate-fade-in"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#121212] to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] to-transparent" />
           </>
         )}
       </div>
@@ -528,101 +783,152 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         
         {/* Left Sidebar Menu (Netflix TV style) */}
         <aside 
-          className={`flex flex-col bg-[#0b0b0b] border-r border-white/5 h-full z-30 transition-all duration-300 shrink-0 ${
-            currentSection === 'sidebar' ? 'w-[260px] shadow-2xl shadow-primary/10' : 'w-[80px]'
+          className={`flex flex-col bg-[#050505] border-r border-white/5 h-full z-30 transition-all duration-300 shrink-0 ${
+            currentSection === 'sidebar' ? 'w-[260px] shadow-2xl shadow-primary/10' : 'w-[76px]'
           }`}
         >
           {/* Netflop Logo */}
           <div className="p-6 flex items-center justify-center border-b border-white/5 h-20 shrink-0 overflow-hidden">
             <span className={`font-black text-primary tracking-tighter transition-all duration-300 ${
-              currentSection === 'sidebar' ? 'text-3xl' : 'text-xl'
+              currentSection === 'sidebar' ? 'text-3xl' : 'text-lg'
             }`}>
               {currentSection === 'sidebar' ? 'NETFLOP' : 'NF'}
             </span>
           </div>
 
           {/* Navigation Items */}
-          <div className="flex-1 flex flex-col justify-center gap-2 p-3 overflow-y-auto">
+          <div className="flex-1 flex flex-col justify-center gap-3 p-2 overflow-y-auto scrollbar-hide">
             {sidebarItems.map((item, idx) => {
               const isSelected = sidebarIndex === idx;
               const isFocused = currentSection === 'sidebar' && isSelected;
               const Icon = item.icon;
+              const isSidebarExpanded = currentSection === 'sidebar';
 
               return (
                 <button
                   key={idx}
                   onClick={() => handleSidebarSelect(idx)}
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-xl transition-all duration-300 text-left outline-none ${
+                  className={`flex items-center transition-all duration-300 outline-none rounded-xl ${
+                    isSidebarExpanded 
+                      ? 'gap-4 py-3 px-4 text-left w-full' 
+                      : 'justify-center p-2.5 w-11 h-11 mx-auto'
+                  } ${
                     isFocused 
-                      ? 'bg-primary text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.5)]' 
+                      ? 'bg-primary text-white scale-110 shadow-[0_0_20px_rgba(229,9,127,0.5)]' 
                       : isSelected
                         ? 'bg-white/10 text-white font-bold'
                         : 'text-text-muted hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <Icon size={22} className={isFocused ? 'animate-pulse' : ''} />
-                  <span className={`text-sm font-bold whitespace-nowrap transition-all duration-300 ${
-                    currentSection === 'sidebar' ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-75 -translate-x-10 w-0'
-                  }`}>
-                    {item.label}
-                  </span>
+                  <Icon size={20} className={`shrink-0 ${isFocused ? 'animate-pulse' : ''}`} />
+                  {isSidebarExpanded && (
+                    <span className="text-sm font-bold whitespace-nowrap opacity-100 scale-100 translate-x-0 transition-all duration-300">
+                      {item.label}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* Indicator Tip for TV Remote */}
-          <div className="p-4 border-t border-white/5 text-center text-[10px] text-text-muted select-none shrink-0 overflow-hidden">
-            {currentSection === 'sidebar' ? (
-              <p className="animate-pulse">Dùng Arrow ➡️ để chọn phim</p>
-            ) : (
-              <p>⬅️ Menu</p>
-            )}
-          </div>
+
         </aside>
 
         {/* Content Showcase Panel */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#0a0a0a]/40 backdrop-blur-xl">
           
-          {/* SEARCH PAGE VIEW */}
+          {/* SEARCH PAGE VIEW WITH VIRTUAL KEYBOARD */}
           {currentSection === 'search' && (
-            <div className="flex-1 flex flex-col p-8 bg-[#121212]/90 z-20 overflow-y-auto">
-              <div className="max-w-4xl mx-auto w-full">
-                <h1 className="text-3xl font-black mb-6 flex items-center gap-3">
-                  <Search size={28} className="text-primary animate-bounce" />
-                  TÌM KIẾM PHIM TRÊN SMART TV
-                </h1>
-                
-                {/* Search Bar */}
-                <div className="relative mb-8">
-                  <input
-                    id="tv-search-input"
-                    type="text"
-                    placeholder="Nhập tên phim cần tìm..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#1c1c1c] border-2 border-white/10 rounded-2xl py-4 px-6 pl-14 text-xl font-bold text-white focus:outline-none focus:border-primary transition-all"
-                  />
-                  <Search size={24} className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted" />
+            <div className="flex-1 flex bg-[#0c0c0c] z-20 overflow-hidden h-full">
+              {/* Left Side: Virtual Keyboard */}
+              <div className="w-[360px] border-r border-white/5 bg-[#080808] p-8 flex flex-col shrink-0 h-full justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <Search className="text-primary animate-pulse" size={24} />
+                    <span className="text-xs font-black tracking-widest text-primary uppercase">Bàn Phím Smart TV</span>
+                  </div>
+                  
+                  {/* Styled Search Query Box */}
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 flex items-center justify-between min-h-[56px] relative group">
+                    <span className="text-lg font-bold text-white tracking-wide truncate">
+                      {searchQuery || <span className="text-text-muted opacity-40">Nhập tìm kiếm...</span>}
+                    </span>
+                    {searchFocusedArea === 'keyboard' && (
+                      <span className="w-1 h-5 bg-primary animate-ping" />
+                    )}
+                  </div>
+
+                  {/* Keyboard Grid */}
+                  <div className="grid grid-cols-6 gap-2">
+                    {VIRTUAL_KEYBOARD.map((key, kIdx) => {
+                      const isFocused = searchFocusedArea === 'keyboard' && keyboardFocusedIdx === kIdx;
+                      const isSpecial = ['SPACE', 'BACK', 'CLEAR'].includes(key);
+                      return (
+                        <button
+                          key={key}
+                          id={`tv-key-${kIdx}`}
+                          onClick={() => handleVirtualKeyPress(key)}
+                          className={`h-11 rounded-lg font-black text-xs transition-all duration-200 outline-none flex items-center justify-center ${
+                            isFocused
+                              ? 'bg-primary text-white scale-110 shadow-[0_0_15px_rgba(229,9,127,0.8)] border border-white'
+                              : isSpecial
+                                ? 'bg-white/10 text-white hover:bg-white/15'
+                                : 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                          } ${
+                            key === 'SPACE' ? 'col-span-2' : ''
+                          } ${
+                            key === 'CLEAR' ? 'col-span-2' : ''
+                          }`}
+                        >
+                          {key === 'SPACE' ? 'CÁCH' : key === 'BACK' ? 'XÓA' : key === 'CLEAR' ? 'RESET' : key}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Search Results Grid */}
+                {/* Keyboard Remote Tip */}
+                <div className="text-[11px] text-text-muted/60 leading-relaxed bg-white/5 p-4 rounded-xl border border-white/5">
+                  <p className="font-bold mb-1 text-white">⚡ Hướng dẫn Remote:</p>
+                  <p>• Nhấn phím mũi tên ➡️ để sang kết quả phim.</p>
+                  <p>• Nhấn ⬅️ từ cột đầu bàn phím để mở Menu.</p>
+                </div>
+              </div>
+
+              {/* Right Side: Search Results */}
+              <div className="flex-1 p-8 flex flex-col overflow-y-auto h-full">
+                <div className="flex items-center justify-between mb-6">
+                  <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                    <span>KẾT QUẢ TÌM KIẾM</span>
+                    {searchQuery && (
+                      <span className="text-text-muted text-sm font-medium">cho "{searchQuery}"</span>
+                    )}
+                  </h1>
+                  {searchResults.length > 0 && (
+                    <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full">
+                      {searchResults.length} Kết quả
+                    </span>
+                  )}
+                </div>
+
                 {searchLoading ? (
-                  <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
+                    <span className="text-xs text-text-muted font-bold">Đang tìm phim...</span>
                   </div>
                 ) : searchResults.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-6">
+                  <div className="grid grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
                     {searchResults.map((movie, idx) => {
-                      const isFocused = searchFocusedIdx === idx && document.activeElement !== document.getElementById('tv-search-input');
+                      const isFocused = searchFocusedArea === 'results' && searchFocusedIdx === idx;
                       return (
                         <div
                           key={movie._id}
+                          id={`tv-search-result-${idx}`}
                           onClick={() => openMovieDetails(movie.slug)}
                           className={`bg-surface rounded-xl overflow-hidden cursor-pointer transition-all duration-300 relative aspect-[2/3] border-2 group ${
-                            isFocused 
-                              ? 'scale-105 border-primary shadow-[0_0_20px_rgba(229,9,127,0.8)]' 
-                              : 'border-white/5'
+                            isFocused
+                              ? 'scale-105 border-primary shadow-[0_0_20px_rgba(229,9,127,0.8)] z-10'
+                              : 'border-white/5 hover:border-white/20'
                           }`}
                         >
                           <img
@@ -632,28 +938,91 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                             referrerPolicy="no-referrer"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-4 flex flex-col justify-end">
-                            <h3 className="font-bold text-sm line-clamp-2">{movie.name}</h3>
-                            <p className="text-xs text-text-muted">{movie.year}</p>
+                            <h3 className="font-bold text-xs line-clamp-2">{movie.name}</h3>
+                            <p className="text-[10px] text-text-muted mt-1">{movie.year}</p>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 ) : searchQuery ? (
-                  <div className="text-center py-20 bg-white/5 rounded-2xl border border-white/10">
-                    <p className="text-lg text-text-muted">Không tìm thấy phim phù hợp rồi bro ơi!</p>
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white/5 rounded-2xl border border-white/5 text-center p-6">
+                    <span className="text-lg text-text-muted font-bold">Không tìm thấy phim phù hợp rồi bro!</span>
+                    <span className="text-xs text-text-muted/60 mt-2">Thử tìm kiếm với từ khóa khác hoặc kiểm tra lại tên phim nhé.</span>
                   </div>
                 ) : (
-                  <div className="text-center py-20 bg-white/5 rounded-2xl border border-white/10">
-                    <p className="text-lg text-text-muted">Nhập từ khóa hoặc dùng bàn phím TV để gõ tìm phim.</p>
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white/5 rounded-2xl border border-white/5 text-center p-6">
+                    <Search size={40} className="text-text-muted opacity-20 mb-3" />
+                    <span className="text-lg text-text-muted font-bold">Hãy nhập tên phim bằng bàn phím TV bên trái</span>
+                    <span className="text-xs text-text-muted/60 mt-1">Hệ thống sẽ tự động tìm kiếm ngay khi bạn gõ.</span>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {/* GENRES GRID VIEW */}
+          {currentSection === 'genres_grid' && (
+            <div className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
+              <h1 className="text-3xl font-black mb-8 flex items-center gap-3">
+                <Film className="text-primary animate-pulse" size={28} />
+                DUYỆT THEO THỂ LOẠI
+              </h1>
+              
+              <div className="grid grid-cols-4 gap-4 max-w-5xl">
+                {GENRES.map((genre, idx) => {
+                  const isFocused = genresFocusedIdx === idx;
+                  return (
+                    <button
+                      key={genre.slug}
+                      id={`tv-genre-${idx}`}
+                      onClick={() => handleGenreSelect(genre.slug, genre.name)}
+                      className={`py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left border-2 ${
+                        isFocused
+                          ? 'bg-primary border-white text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.8)]'
+                          : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {genre.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* COUNTRIES GRID VIEW */}
+          {currentSection === 'countries_grid' && (
+            <div className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
+              <h1 className="text-3xl font-black mb-8 flex items-center gap-3">
+                <Globe className="text-primary animate-pulse" size={28} />
+                DUYỆT THEO QUỐC GIA
+              </h1>
+              
+              <div className="grid grid-cols-4 gap-4 max-w-5xl">
+                {COUNTRIES.map((country, idx) => {
+                  const isFocused = countriesFocusedIdx === idx;
+                  return (
+                    <button
+                      key={country.slug}
+                      id={`tv-country-${idx}`}
+                      onClick={() => handleCountrySelect(country.slug, country.name)}
+                      className={`py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left border-2 ${
+                        isFocused
+                          ? 'bg-primary border-white text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.8)]'
+                          : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {country.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* HOME / SHELVES VIEW */}
-          {currentSection !== 'search' && (
+          {currentSection !== 'search' && currentSection !== 'genres_grid' && currentSection !== 'countries_grid' && (
             <div className="flex-1 flex flex-col h-full overflow-y-auto">
               
               {/* Giant Netflix Hero Banner */}
@@ -729,7 +1098,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                     <p className="text-text-muted max-w-md">Hãy duyệt qua các phim ngoài Trang chủ và bấm "LƯU DANH SÁCH" để thêm phim vào đây bạn nhé!</p>
                   </div>
                 ) : (
-                  shelvesData.map((shelf, sIdx) => {
+                  visibleShelves.map((shelf, sIdx) => {
                     const isShelfFocused = currentSection === 'shelves' && activeShelf === sIdx;
                     return (
                       <div key={sIdx} className="space-y-4">
@@ -768,6 +1137,16 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                                   <h3 className="font-bold text-xs line-clamp-2 text-white">{movie.name}</h3>
                                   <p className="text-[10px] text-text-muted mt-1">{movie.year}</p>
                                 </div>
+
+                                {/* Progress Bar for History item */}
+                                {shelf.isHistory && movie.progress !== undefined && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20 z-20">
+                                    <div 
+                                      className="h-full bg-primary transition-all duration-300"
+                                      style={{ width: `${movie.progress}%` }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -850,6 +1229,30 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                       dangerouslySetInnerHTML={{ __html: selectedMovie.content }}
                     />
 
+                    {/* Metadata list */}
+                    <div className="grid grid-cols-2 gap-2 text-xs text-text-muted bg-[#1f1f1f]/50 p-4 rounded-xl border border-white/5">
+                      {selectedMovie.category && (
+                        <div>
+                          <span className="font-bold text-white">Thể loại:</span> {selectedMovie.category.map(c => c.name).join(', ')}
+                        </div>
+                      )}
+                      {selectedMovie.country && (
+                        <div>
+                          <span className="font-bold text-white">Quốc gia:</span> {selectedMovie.country.map(c => c.name).join(', ')}
+                        </div>
+                      )}
+                      {selectedMovie.director && selectedMovie.director.length > 0 && selectedMovie.director[0] !== "" && (
+                        <div>
+                          <span className="font-bold text-white">Đạo diễn:</span> {Array.isArray(selectedMovie.director) ? selectedMovie.director.join(', ') : selectedMovie.director}
+                        </div>
+                      )}
+                      {selectedMovie.actor && selectedMovie.actor.length > 0 && selectedMovie.actor[0] !== "" && (
+                        <div className="col-span-2 line-clamp-1">
+                          <span className="font-bold text-white">Diễn viên:</span> {Array.isArray(selectedMovie.actor) ? selectedMovie.actor.join(', ') : selectedMovie.actor}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Action Buttons */}
                     <div className="flex gap-4">
                       <button
@@ -893,12 +1296,13 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                         CHỌN TẬP PHIM (Dùng D-Pad TV)
                       </h3>
 
-                      <div className="grid grid-cols-6 gap-3 max-h-[25vh] overflow-y-auto pr-2">
+                      <div className="grid grid-cols-6 gap-3 max-h-[22vh] overflow-y-auto pr-2">
                         {selectedMovie.episodes[selectedServerIdx]?.server_data.map((ep, idx) => {
                           const isFocused = modalFocus === 'episodes' && focusedEpisodeIdx === idx;
                           return (
                             <button
                               key={idx}
+                              id={`tv-episode-${idx}`}
                               onClick={() => playEpisode(ep.link_embed, ep.name)}
                               className={`py-3 px-2 rounded-xl font-bold text-sm transition-all outline-none border ${
                                 isFocused
@@ -956,11 +1360,6 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         </div>
       )}
 
-      {/* TV Mode floating notice / tip */}
-      <div className="fixed bottom-6 right-6 bg-primary/20 border border-primary/30 py-2 px-4 rounded-full text-xs font-bold text-primary flex items-center gap-2 pointer-events-none z-30 shadow-lg backdrop-blur-md">
-        <Sparkles size={14} className="animate-spin" />
-        CHẾ ĐỘ SMART TV: Sử dụng bàn phím / remote để di chuyển
-      </div>
     </div>
   );
 }
