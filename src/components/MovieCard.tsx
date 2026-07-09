@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Movie, getImageUrl, cn } from '../services/api';
+import { Movie, getImageUrl, handleImageError, cn } from '../services/api';
 
 interface MovieCardProps {
   movie: Movie;
@@ -21,6 +21,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie, onRemove, progress }) => {
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
           loading="lazy"
+          onError={handleImageError}
         />
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
           <div className="w-12 h-12 rounded-full border-2 border-primary flex items-center justify-center bg-primary/20 shadow-[0_0_15px_rgba(229,9,127,0.5)]">

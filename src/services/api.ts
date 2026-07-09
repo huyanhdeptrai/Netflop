@@ -1,3 +1,4 @@
+import React from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -50,18 +51,32 @@ export interface MovieDetail extends Movie {
 export const getImageUrl = (url: string) => {
   if (!url) return '';
   
-  // If it's a relative path, prepend the KKPhim optimized CDN domain
-  if (!url.startsWith('http')) {
-    return `https://images.kkphim.com/${url}`;
+  // If it's already an absolute URL
+  if (url.startsWith('http')) {
+    let cleanUrl = url;
+    // Replace broken/unsupported images.kkphim.com or potentially blocked phimimg.com with the official fast CDN img.phimapi.com
+    if (cleanUrl.includes('images.kkphim.com')) {
+      cleanUrl = cleanUrl.replace('images.kkphim.com', 'img.phimapi.com');
+    } else if (cleanUrl.includes('phimimg.com')) {
+      cleanUrl = cleanUrl.replace('phimimg.com', 'img.phimapi.com');
+    }
+    return cleanUrl;
   }
   
-  // If it's an absolute path, replace phimimg.com with images.kkphim.com to ensure high speed and bypass blocks
-  let cleanUrl = url;
-  if (cleanUrl.includes('phimimg.com')) {
-    cleanUrl = cleanUrl.replace('phimimg.com', 'images.kkphim.com');
+  // If it's a relative path, prepend the official PhimApi CDN domain (img.phimapi.com)
+  return `https://img.phimapi.com/${url}`;
+};
+
+export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const target = e.currentTarget;
+  // If img.phimapi.com failed, attempt to fall back to the raw phimimg.com domain
+  if (target.src.includes('img.phimapi.com')) {
+    target.src = target.src.replace('img.phimapi.com', 'phimimg.com');
+  } 
+  // If the raw domain also failed or we are on other domain, fall back to a high-quality dark cinematic placeholder
+  else if (target.src.includes('phimimg.com')) {
+    target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=400&auto=format&fit=crop';
   }
-  
-  return cleanUrl;
 };
 
 export const fetchMovies = async (page = 1) => {

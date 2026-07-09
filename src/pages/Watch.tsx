@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, fetchGenreMovies, fetchMovies } from '../services/api';
+import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies } from '../services/api';
 import { List, ChevronRight, Info, Sparkles, ChevronsRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHistory } from '../services/HistoryContext';
@@ -366,6 +366,7 @@ export default function Watch() {
                           alt={m.name} 
                           className="w-full h-full object-cover transition-transform group-hover:scale-110"
                           referrerPolicy="no-referrer"
+                          onError={handleImageError}
                         />
                       </div>
                       <div className="flex-1 py-1">

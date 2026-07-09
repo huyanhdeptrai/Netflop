@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, Film, Tv, Heart, LogOut, Play, Star, Calendar, Clock, Globe, ArrowLeft, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 
 interface TVAppProps {
@@ -936,6 +936,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                             alt={movie.name}
                             className="w-full h-full object-cover"
                             referrerPolicy="no-referrer"
+                            onError={handleImageError}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-4 flex flex-col justify-end">
                             <h3 className="font-bold text-xs line-clamp-2">{movie.name}</h3>
@@ -1130,6 +1131,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                                   alt={movie.name}
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"
+                                  onError={handleImageError}
                                 />
                                 
                                 {/* Poster Gradient Overlay */}
@@ -1187,6 +1189,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                     alt={selectedMovie.name}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
+                    onError={handleImageError}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/10 to-transparent" />
                 </div>

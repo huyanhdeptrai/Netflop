@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, getImageUrl, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie } from '../services/api';
+import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie } from '../services/api';
 import { Play, Heart, Share2, Star, Calendar, Clock, Globe, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useFavorites } from '../services/FavoritesContext';
@@ -117,6 +117,7 @@ export default function MovieDetails() {
           alt={movie.name}
           className="w-full h-full object-cover opacity-30 blur-sm"
           referrerPolicy="no-referrer"
+          onError={handleImageError}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
       </div>
@@ -135,6 +136,7 @@ export default function MovieDetails() {
                 alt={movie.name}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
+                onError={handleImageError}
               />
             </div>
           </motion.div>
