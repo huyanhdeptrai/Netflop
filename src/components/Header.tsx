@@ -102,7 +102,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
             NETFLOP
           </Link>
           
-          <nav className="hidden xl:flex items-center gap-5 text-sm font-medium">
+          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium">
             <Link to="/" className="hover:text-primary transition-colors whitespace-nowrap">Trang chủ</Link>
             
             {/* Phân loại Dropdown */}
@@ -111,7 +111,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                 Phân loại
                 <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </span>
-              <div className="absolute top-full left-0 bg-[#1A1A1A] border border-white/10 rounded-2xl p-4 shadow-2xl hidden group-hover:block w-[400px] z-50">
+              <div className="absolute top-full left-0 bg-[#1A1A1A] border border-white/10 rounded-2xl p-4 shadow-2xl hidden group-hover:block w-[380px] z-50">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {CATEGORIES.map(cat => (
                     <Link
@@ -129,10 +129,6 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
 
             <Link to="/category/phim-bo" className="hover:text-primary transition-colors whitespace-nowrap">Phim bộ</Link>
             <Link to="/category/phim-le" className="hover:text-primary transition-colors whitespace-nowrap">Phim lẻ</Link>
-            <Link to="/category/phim-vietsub" className="hover:text-primary transition-colors whitespace-nowrap">Vietsub</Link>
-            <Link to="/category/phim-thuyet-minh" className="hover:text-primary transition-colors whitespace-nowrap">Thuyết minh</Link>
-            <Link to="/category/phim-bo-dang-chieu" className="hover:text-primary transition-colors whitespace-nowrap">Đang chiếu</Link>
-            <Link to="/category/phim-sap-chieu" className="hover:text-primary transition-colors whitespace-nowrap">Sắp chiếu</Link>
             <Link to="/category/hoat-hinh" className="hover:text-primary transition-colors whitespace-nowrap">Hoạt hình</Link>
             <Link to="/category/tv-shows" className="hover:text-primary transition-colors whitespace-nowrap">TV Shows</Link>
             
