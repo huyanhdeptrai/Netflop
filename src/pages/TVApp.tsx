@@ -78,18 +78,38 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     const loadTVData = async () => {
       setLoading(true);
       try {
-        const [phimMoi, phimBo, phimLe, hoatHinh] = await Promise.all([
+        const [
+          phimMoi,
+          phimDangChieu,
+          phimVietsub,
+          phimThuyetMinh,
+          phimBo,
+          phimLe,
+          phimSapChieu,
+          hoatHinh,
+          tvShows
+        ] = await Promise.all([
           fetchMovies(1),
+          fetchCategoryMovies('phim-bo-dang-chieu', 1),
+          fetchCategoryMovies('phim-vietsub', 1),
+          fetchCategoryMovies('phim-thuyet-minh', 1),
           fetchCategoryMovies('phim-bo', 1),
           fetchCategoryMovies('phim-le', 1),
+          fetchCategoryMovies('phim-sap-chieu', 1),
           fetchCategoryMovies('hoat-hinh', 1),
+          fetchCategoryMovies('tv-shows', 1)
         ]);
 
         const shelves = [
           { title: 'Phim Mới Cập Nhật 🍿', movies: phimMoi.items?.slice(0, 15) || [] },
-          { title: 'Phim Bộ Hot 🔥', movies: phimBo.data?.items?.slice(0, 15) || [] },
+          { title: 'Phim Bộ Đang Chiếu ⚡', movies: phimDangChieu.data?.items?.slice(0, 15) || [] },
+          { title: 'Phim Vietsub Hot 💬', movies: phimVietsub.data?.items?.slice(0, 15) || [] },
+          { title: 'Phim Thuyết Minh 🎙️', movies: phimThuyetMinh.data?.items?.slice(0, 15) || [] },
+          { title: 'Phim Bộ Nổi Bật 🔥', movies: phimBo.data?.items?.slice(0, 15) || [] },
           { title: 'Phim Lẻ Chọn Lọc 🎬', movies: phimLe.data?.items?.slice(0, 15) || [] },
+          { title: 'Phim Sắp Chiếu ⏰', movies: phimSapChieu.data?.items?.slice(0, 15) || [] },
           { title: 'Hoạt Hình Đặc Sắc 🦄', movies: hoatHinh.data?.items?.slice(0, 15) || [] },
+          { title: 'TV Shows Giải Trí 🎭', movies: tvShows.data?.items?.slice(0, 15) || [] },
         ];
 
         setShelvesData(shelves);

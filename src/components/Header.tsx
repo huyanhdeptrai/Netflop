@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight, Tv } from 'lucide-react';
-import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES } from '../services/api';
+import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES, CATEGORIES } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -102,16 +102,43 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
             NETFLOP
           </Link>
           
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <Link to="/" className="hover:text-primary transition-colors">Trang chủ</Link>
-            <Link to="/category/phim-bo" className="hover:text-primary transition-colors">Phim bộ</Link>
-            <Link to="/category/phim-le" className="hover:text-primary transition-colors">Phim lẻ</Link>
-            <Link to="/category/hoat-hinh" className="hover:text-primary transition-colors">Hoạt hình</Link>
-            <Link to="/category/tv-shows" className="hover:text-primary transition-colors">TV Shows</Link>
+          <nav className="hidden xl:flex items-center gap-5 text-sm font-medium">
+            <Link to="/" className="hover:text-primary transition-colors whitespace-nowrap">Trang chủ</Link>
+            
+            {/* Phân loại Dropdown */}
+            <div className="relative group py-5 cursor-pointer">
+              <span className="hover:text-primary transition-colors flex items-center gap-1 whitespace-nowrap">
+                Phân loại
+                <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </span>
+              <div className="absolute top-full left-0 bg-[#1A1A1A] border border-white/10 rounded-2xl p-4 shadow-2xl hidden group-hover:block w-[400px] z-50">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {CATEGORIES.map(cat => (
+                    <Link
+                      key={cat.slug}
+                      to={`/category/${cat.slug}`}
+                      className="flex items-center gap-2 p-2 hover:bg-white/5 rounded-lg transition-colors hover:text-primary"
+                    >
+                      <span className="text-base">{cat.icon}</span>
+                      <span className="font-semibold">{cat.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Link to="/category/phim-bo" className="hover:text-primary transition-colors whitespace-nowrap">Phim bộ</Link>
+            <Link to="/category/phim-le" className="hover:text-primary transition-colors whitespace-nowrap">Phim lẻ</Link>
+            <Link to="/category/phim-vietsub" className="hover:text-primary transition-colors whitespace-nowrap">Vietsub</Link>
+            <Link to="/category/phim-thuyet-minh" className="hover:text-primary transition-colors whitespace-nowrap">Thuyết minh</Link>
+            <Link to="/category/phim-bo-dang-chieu" className="hover:text-primary transition-colors whitespace-nowrap">Đang chiếu</Link>
+            <Link to="/category/phim-sap-chieu" className="hover:text-primary transition-colors whitespace-nowrap">Sắp chiếu</Link>
+            <Link to="/category/hoat-hinh" className="hover:text-primary transition-colors whitespace-nowrap">Hoạt hình</Link>
+            <Link to="/category/tv-shows" className="hover:text-primary transition-colors whitespace-nowrap">TV Shows</Link>
             
             {/* Thể loại Dropdown */}
             <div className="relative group py-5 cursor-pointer">
-              <span className="hover:text-primary transition-colors flex items-center gap-1">
+              <span className="hover:text-primary transition-colors flex items-center gap-1 whitespace-nowrap">
                 Thể loại
                 <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </span>
@@ -132,7 +159,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
 
             {/* Quốc gia Dropdown */}
             <div className="relative group py-5 cursor-pointer">
-              <span className="hover:text-primary transition-colors flex items-center gap-1">
+              <span className="hover:text-primary transition-colors flex items-center gap-1 whitespace-nowrap">
                 Quốc gia
                 <svg className="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
               </span>

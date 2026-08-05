@@ -49,7 +49,7 @@ export interface MovieDetail extends Movie {
 }
 
 export const getImageUrl = (url: string) => {
-  if (!url) return '';
+  if (!url) return 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=400&auto=format&fit=crop';
   
   // If it's already an absolute URL
   if (url.startsWith('http')) {
@@ -63,8 +63,12 @@ export const getImageUrl = (url: string) => {
     return cleanUrl;
   }
   
-  // If it's a relative path, prepend the official PhimApi CDN domain (img.phimapi.com)
-  return `https://img.phimapi.com/${url}`;
+  // If it's a relative path, ensure uploads/movies prefix if missing and prepend official PhimApi CDN domain (img.phimapi.com)
+  const cleanPath = url.startsWith('/') ? url.slice(1) : url;
+  if (!cleanPath.startsWith('uploads/')) {
+    return `https://img.phimapi.com/uploads/movies/${cleanPath}`;
+  }
+  return `https://img.phimapi.com/${cleanPath}`;
 };
 
 export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -74,7 +78,7 @@ export const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event
     target.src = target.src.replace('img.phimapi.com', 'phimimg.com');
   } 
   // If the raw domain also failed or we are on other domain, fall back to a high-quality dark cinematic placeholder
-  else if (target.src.includes('phimimg.com')) {
+  else {
     target.src = 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=400&auto=format&fit=crop';
   }
 };
@@ -84,17 +88,156 @@ export const fetchMovies = async (page = 1) => {
   return res.json();
 };
 
-export const fetchMovieDetail = async (slug: string) => {
-  const res = await fetch(`${API_BASE_URL}/phim/${slug}`);
+export const fetchMoviesV1 = async (page = 1) => {
+  const res = await fetch(`${API_BASE_URL}/v1/api/danh-sach/phim-moi-cap-nhat?page=${page}`);
   return res.json();
 };
 
-export const searchMovies = async (keyword: string, page = 1) => {
-  const res = await fetch(`${API_BASE_URL}/v1/api/tim-kiem?keyword=${keyword}&page=${page}`);
-  return res.json();
+export const fetchMovieDetail = async (slug: string) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/phim/${slug}`);
+    const data = await res.json();
+    if (data.status === true || data.status === 'success' || data.movie) {
+      return data;
+    }
+  } catch (e) {
+    console.error('PhimAPI detail error:', e);
+  }
+
+  // Fallback to NguonC API if PhimAPI does not have this movie
+  try {
+    const resNguonc = await fetch(`https://phim.nguonc.com/api/film/${slug}`);
+    const dataNguonc = await resNguonc.json();
+    if (dataNguonc.status === 'success' && dataNguonc.movie) {
+      const m = dataNguonc.movie;
+
+      const categories: { name: string; slug: string }[] = [];
+      const countries: { name: string; slug: string }[] = [];
+      if (m.category) {
+        Object.values(m.category).forEach((catGroup: any) => {
+          if (catGroup.group?.name === 'Thể loại' && Array.isArray(catGroup.list)) {
+            catGroup.list.forEach((item: any) => categories.push({ name: item.name, slug: item.slug }));
+          }
+          if (catGroup.group?.name === 'Quốc gia' && Array.isArray(catGroup.list)) {
+            catGroup.list.forEach((item: any) => countries.push({ name: item.name, slug: item.slug }));
+          }
+        });
+      }
+
+      const episodes = (m.episodes || []).map((srv: any) => ({
+        server_name: srv.server_name || 'NguonC',
+        server_data: (srv.items || []).map((ep: any) => ({
+          name: ep.name,
+          slug: ep.slug,
+          filename: ep.name,
+          link_embed: ep.embed || '',
+          link_m3u8: ep.m3u8 || ep.embed || ''
+        }))
+      }));
+
+      return {
+        status: true,
+        movie: {
+          _id: m.id,
+          name: m.name,
+          slug: m.slug,
+          origin_name: m.original_name || m.name,
+          content: m.description || '',
+          thumb_url: m.thumb_url,
+          poster_url: m.poster_url,
+          year: m.created ? new Date(m.created).getFullYear() : 2024,
+          type: 'single',
+          status: m.current_episode || 'completed',
+          time: m.time || '',
+          episode_current: m.current_episode || '',
+          episode_total: m.total_episodes ? `${m.total_episodes}` : '',
+          quality: m.quality || 'HD',
+          lang: m.language || 'Vietsub',
+          actor: m.casts ? m.casts.split(',').map((a: string) => a.trim()) : [],
+          director: m.director ? m.director.split(',').map((d: string) => d.trim()) : [],
+          category: categories,
+          country: countries
+        },
+        episodes
+      };
+    }
+  } catch (e) {
+    console.error('NguonC detail error:', e);
+  }
+
+  return { status: false, msg: 'Không tìm thấy phim' };
+};
+
+export const searchMovies = async (keyword: string, page = 1, limit = 24) => {
+  const cleanKeyword = keyword.trim();
+  if (!cleanKeyword) {
+    return { status: 'success', data: { items: [], params: { pagination: { totalItems: 0, totalPages: 1 } } } };
+  }
+
+  const encKey = encodeURIComponent(cleanKeyword);
+
+  try {
+    // Search both PhimAPI & NguonC simultaneously for exact keywords
+    const [phimApiRes, nguoncRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/v1/api/tim-kiem?keyword=${encKey}&page=${page}&limit=${limit}`).then(r => r.json()).catch(() => null),
+      fetch(`https://phim.nguonc.com/api/films/search?keyword=${encKey}`).then(r => r.json()).catch(() => null)
+    ]);
+
+    const combinedItems: Movie[] = [];
+    const seenSlugs = new Set<string>();
+
+    // 1. Add exact results from PhimAPI
+    const phimApiList: Movie[] = phimApiRes?.data?.items || phimApiRes?.items || [];
+    for (const item of phimApiList) {
+      if (!seenSlugs.has(item.slug)) {
+        seenSlugs.add(item.slug);
+        combinedItems.push(item);
+      }
+    }
+
+    // 2. Add exact results from NguonC API
+    if (nguoncRes?.items && Array.isArray(nguoncRes.items)) {
+      for (const item of nguoncRes.items) {
+        if (!seenSlugs.has(item.slug)) {
+          seenSlugs.add(item.slug);
+          combinedItems.push({
+            _id: item.id,
+            name: item.name,
+            slug: item.slug,
+            origin_name: item.original_name || item.name,
+            thumb_url: item.thumb_url,
+            poster_url: item.poster_url,
+            year: item.created ? new Date(item.created).getFullYear() : 2024,
+            modified: {
+              time: item.modified || item.created || ''
+            }
+          });
+        }
+      }
+    }
+
+    return {
+      status: 'success',
+      data: {
+        items: combinedItems,
+        params: {
+          pagination: {
+            totalItems: combinedItems.length,
+            totalItemsPerPage: limit,
+            currentPage: page,
+            totalPages: 1
+          }
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Search API error:', error);
+    return { status: 'error', data: { items: [] } };
+  }
 };
 
 export const fetchCategoryMovies = async (category: string, page = 1) => {
+  // Handles phim-bo, phim-le, hoat-hinh, tv-shows, phim-vietsub, phim-thuyet-minh, phim-long-tieng, phim-bo-dang-chieu, phim-bo-hoan-thanh, phim-sap-chieu, subteam, etc.
   const res = await fetch(`${API_BASE_URL}/v1/api/danh-sach/${category}?page=${page}`);
   return res.json();
 };
@@ -108,6 +251,41 @@ export const fetchCountryMovies = async (country: string, page = 1) => {
   const res = await fetch(`${API_BASE_URL}/v1/api/quoc-gia/${country}?page=${page}`);
   return res.json();
 };
+
+export const fetchGenresList = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/api/the-loai`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch genres list:', err);
+    return null;
+  }
+};
+
+export const fetchCountriesList = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/api/quoc-gia`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch countries list:', err);
+    return null;
+  }
+};
+
+export const CATEGORIES = [
+  { slug: 'phim-moi-cap-nhat', name: 'Phim Mới Cập Nhật', icon: '🍿' },
+  { slug: 'phim-bo', name: 'Phim Bộ', icon: '📺' },
+  { slug: 'phim-le', name: 'Phim Lẻ', icon: '🎬' },
+  { slug: 'phim-vietsub', name: 'Phim Vietsub', icon: '💬' },
+  { slug: 'phim-thuyet-minh', name: 'Phim Thuyết Minh', icon: '🎙️' },
+  { slug: 'phim-long-tieng', name: 'Phim Lồng Tiếng', icon: '🔊' },
+  { slug: 'phim-bo-dang-chieu', name: 'Phim Bộ Đang Chiếu', icon: '⚡' },
+  { slug: 'phim-bo-hoan-thanh', name: 'Phim Trọn Bộ', icon: '✅' },
+  { slug: 'phim-sap-chieu', name: 'Phim Sắp Chiếu', icon: '⏰' },
+  { slug: 'hoat-hinh', name: 'Hoạt Hình', icon: '🦄' },
+  { slug: 'tv-shows', name: 'TV Shows', icon: '🎭' },
+  { slug: 'subteam', name: 'Subteam', icon: '⭐' }
+];
 
 export const GENRES = [
   { slug: 'hanh-dong', name: 'Hành Động' },

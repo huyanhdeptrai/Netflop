@@ -87,12 +87,12 @@ export default function SearchPage() {
             </div>
           </div>
           
-          <h2 className="text-4xl font-black mb-4 text-white tracking-tight">
-            Tìm cái chóa gì vậy cu ???
+          <h2 className="text-3xl font-black mb-4 text-white tracking-tight">
+            Không tìm thấy phim phù hợp
           </h2>
           
-          <p className="text-text-muted text-lg mb-10 leading-relaxed">
-            Phim này đ có hoặc là do m tìm ngu, vui lòng tìm lại bằng tên khác hoặc kiểm tra lại chính tả đi nhé!
+          <p className="text-text-muted text-base mb-8 leading-relaxed">
+            Rất tiếc, chúng tôi không tìm thấy bộ phim nào trùng khớp với từ khóa "<span className="text-white font-semibold">{query}</span>". Bạn vui lòng kiểm tra lại chính tả hoặc thử tìm với tên tiếng Việt / tiếng Anh ngắn hơn nhé.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4 mb-20">

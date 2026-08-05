@@ -1,37 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { fetchMovies, fetchCategoryMovies, Movie } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, Movie, CATEGORIES, getImageUrl, handleImageError } from '../services/api';
 import MovieCard from '../components/MovieCard';
-import { ChevronRight, ChevronLeft, Play, Info } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Play, Info, Sparkles, Flame, Film, Tv, Radio, Clock, Mic, MessageSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { useHistory } from '../services/HistoryContext';
 
 export default function Home() {
   const [newMovies, setNewMovies] = useState<Movie[]>([]);
+  const [ongoingSeries, setOngoingSeries] = useState<Movie[]>([]);
+  const [vietsubMovies, setVietsubMovies] = useState<Movie[]>([]);
+  const [thuyetMinhMovies, setThuyetMinhMovies] = useState<Movie[]>([]);
   const [seriesMovies, setSeriesMovies] = useState<Movie[]>([]);
   const [singleMovies, setSingleMovies] = useState<Movie[]>([]);
+  const [upcomingMovies, setUpcomingMovies] = useState<Movie[]>([]);
   const [animeMovies, setAnimeMovies] = useState<Movie[]>([]);
+  const [tvShows, setTvShows] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
-  const { history, removeFromHistory } = useHistory();
+  const { history } = useHistory();
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [newData, seriesData, singleData, animeData] = await Promise.all([
+        const [
+          p1,
+          p2,
+          ongoingData,
+          vietsubData,
+          thuyetMinhData,
+          seriesData,
+          singleData,
+          upcomingData,
+          animeData,
+          tvData
+        ] = await Promise.all([
           fetchMovies(1),
+          fetchMovies(2),
+          fetchCategoryMovies('phim-bo-dang-chieu', 1),
+          fetchCategoryMovies('phim-vietsub', 1),
+          fetchCategoryMovies('phim-thuyet-minh', 1),
           fetchCategoryMovies('phim-bo', 1),
           fetchCategoryMovies('phim-le', 1),
-          fetchCategoryMovies('hoat-hinh', 1)
+          fetchCategoryMovies('phim-sap-chieu', 1),
+          fetchCategoryMovies('hoat-hinh', 1),
+          fetchCategoryMovies('tv-shows', 1)
         ]);
 
-        setNewMovies(newData.items);
-        setSeriesMovies(seriesData.data.items.slice(0, 6));
-        setSingleMovies(singleData.data.items.slice(0, 6));
-        setAnimeMovies(animeData.data.items.slice(0, 6));
+        const combinedNew = [...(p1.items || []), ...(p2.items || [])];
+        setNewMovies(combinedNew.slice(0, 18));
+        setOngoingSeries(ongoingData.data?.items?.slice(0, 6) || []);
+        setVietsubMovies(vietsubData.data?.items?.slice(0, 6) || []);
+        setThuyetMinhMovies(thuyetMinhData.data?.items?.slice(0, 6) || []);
+        setSeriesMovies(seriesData.data?.items?.slice(0, 6) || []);
+        setSingleMovies(singleData.data?.items?.slice(0, 6) || []);
+        setUpcomingMovies(upcomingData.data?.items?.slice(0, 6) || []);
+        setAnimeMovies(animeData.data?.items?.slice(0, 6) || []);
+        setTvShows(tvData.data?.items?.slice(0, 6) || []);
 
-        if (newData.items.length > 0) {
-          setHeroMovie(newData.items[Math.floor(Math.random() * 5)]);
+        if (combinedNew.length > 0) {
+          setHeroMovie(combinedNew[Math.floor(Math.random() * Math.min(8, combinedNew.length))]);
         }
       } catch (error) {
         console.error('Failed to fetch movies:', error);
@@ -48,7 +76,7 @@ export default function Home() {
         <div className="h-[60vh] skeleton rounded-2xl mb-12" />
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
           {[...Array(12)].map((_, i) => (
-            <div key={i} className="aspect-[2/3] skeleton rounded-xl" />
+            <div key={i} className="aspect-[2/3] skeleton rounded-xl bg-white/5 animate-pulse" />
           ))}
         </div>
       </div>
@@ -62,10 +90,11 @@ export default function Home() {
         <section className="relative h-[60vh] sm:h-[80vh] w-full overflow-hidden">
           <div className="absolute inset-0">
             <img
-              src={heroMovie.thumb_url}
+              src={getImageUrl(heroMovie.thumb_url || heroMovie.poster_url)}
               alt={heroMovie.name}
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
+              onError={handleImageError}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-transparent" />
@@ -82,7 +111,7 @@ export default function Home() {
                 {heroMovie.name}
               </h1>
               <p className="text-text-muted text-sm sm:text-base md:text-lg mb-6 sm:mb-8 line-clamp-2 sm:line-clamp-3">
-                {heroMovie.origin_name} ({heroMovie.year}) - Khám phá bộ phim hấp dẫn nhất hiện nay trên Netflop. Trải nghiệm chất lượng hình ảnh sắc nét và âm thanh sống động.
+                {heroMovie.origin_name} ({heroMovie.year}) - Khám phá bộ phim hấp dẫn nhất vừa được cập nhật trên hệ thống Netflop. Trải nghiệm chất lượng hình ảnh sắc nét, tốc độ xem mượt mà.
               </p>
               <div className="flex items-center gap-3 sm:gap-4">
                 <Link to={`/movie/${heroMovie.slug}`} className="btn-primary flex items-center gap-2 text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3">
@@ -99,14 +128,35 @@ export default function Home() {
         </section>
       )}
 
+      {/* Quick Category Quick-Links */}
+      <div className="max-w-7xl mx-auto px-4 mt-8">
+        <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.slug}
+              to={`/category/${cat.slug}`}
+              className="px-4 py-2 rounded-xl bg-surface border border-white/5 hover:border-primary hover:bg-primary/10 transition-all text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap shrink-0 group"
+            >
+              <span>{cat.icon}</span>
+              <span className="group-hover:text-primary transition-colors">{cat.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* Movie Sections */}
-      <div className="max-w-7xl mx-auto px-4 mt-12 space-y-12">
+      <div className="max-w-7xl mx-auto px-4 mt-10 space-y-12">
+        
+        {/* Phim Mới Cập Nhật */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              Phim Mới Cập Nhật
+              🍿 Phim Mới Cập Nhật
             </h2>
+            <Link to="/category/phim-moi-cap-nhat" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+              Xem tất cả <ChevronRight size={16} />
+            </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
             {newMovies.map((movie) => (
@@ -162,10 +212,11 @@ export default function Home() {
                         className="block aspect-video relative rounded-xl overflow-hidden mb-3 border border-white/5"
                       >
                         <img 
-                          src={movie.thumb_url} 
+                          src={getImageUrl(movie.thumb_url || movie.poster_url)} 
                           alt={movie.name} 
                           className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           referrerPolicy="no-referrer"
+                          onError={handleImageError}
                         />
                         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-2 shadow-[0_0_15px_rgba(229,9,127,0.5)]">
@@ -206,14 +257,75 @@ export default function Home() {
           </section>
         )}
 
+        {/* Phim Bộ Đang Chiếu */}
+        {ongoingSeries.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="w-1 h-8 bg-primary rounded-full" />
+                ⚡ Phim Bộ Đang Chiếu Hot
+              </h2>
+              <Link to="/category/phim-bo-dang-chieu" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {ongoingSeries.map((movie) => (
+                <MovieCard key={movie._id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Phim Vietsub */}
+        {vietsubMovies.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="w-1 h-8 bg-primary rounded-full" />
+                💬 Phim Vietsub Mới
+              </h2>
+              <Link to="/category/phim-vietsub" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {vietsubMovies.map((movie) => (
+                <MovieCard key={movie._id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Phim Thuyết Minh */}
+        {thuyetMinhMovies.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="w-1 h-8 bg-primary rounded-full" />
+                🎙️ Phim Thuyết Minh & Lồng Tiếng
+              </h2>
+              <Link to="/category/phim-thuyet-minh" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {thuyetMinhMovies.map((movie) => (
+                <MovieCard key={movie._id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Phim Bộ */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              Phim Bộ Mới
+              📺 Phim Bộ Nổi Bật
             </h2>
-            <Link to="/category/phim-bo" className="text-primary text-sm font-bold hover:underline">
-              Xem tất cả
+            <Link to="/category/phim-bo" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+              Xem tất cả <ChevronRight size={16} />
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
@@ -223,14 +335,15 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Phim Lẻ */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              Phim Lẻ Mới
+              🎬 Phim Lẻ Mới
             </h2>
-            <Link to="/category/phim-le" className="text-primary text-sm font-bold hover:underline">
-              Xem tất cả
+            <Link to="/category/phim-le" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+              Xem tất cả <ChevronRight size={16} />
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
@@ -240,14 +353,35 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Phim Sắp Chiếu */}
+        {upcomingMovies.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="w-1 h-8 bg-primary rounded-full" />
+                ⏰ Phim Sắp Chiếu
+              </h2>
+              <Link to="/category/phim-sap-chieu" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {upcomingMovies.map((movie) => (
+                <MovieCard key={movie._id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Hoạt Hình */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              Hoạt Hình Đặc Sắc
+              🦄 Hoạt Hình Đặc Sắc
             </h2>
-            <Link to="/category/hoat-hinh" className="text-primary text-sm font-bold hover:underline">
-              Xem tất cả
+            <Link to="/category/hoat-hinh" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+              Xem tất cả <ChevronRight size={16} />
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
@@ -256,6 +390,27 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+        {/* TV Shows */}
+        {tvShows.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span className="w-1 h-8 bg-primary rounded-full" />
+                🎭 TV Shows Giải Trí
+              </h2>
+              <Link to="/category/tv-shows" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+                Xem tất cả <ChevronRight size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {tvShows.map((movie) => (
+                <MovieCard key={movie._id} movie={movie} />
+              ))}
+            </div>
+          </section>
+        )}
+
       </div>
     </div>
   );

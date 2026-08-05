@@ -7,7 +7,8 @@ import {
   fetchMovies, 
   Movie,
   GENRES,
-  COUNTRIES
+  COUNTRIES,
+  CATEGORIES
 } from '../services/api';
 import MovieCard from '../components/MovieCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -22,15 +23,10 @@ export default function CategoryPage() {
   const getCategoryTitle = () => {
     if (!category) return 'Danh mục';
     
-    const mainCategories: Record<string, string> = {
-      'phim-bo': 'Phim Bộ',
-      'phim-le': 'Phim Lẻ',
-      'hoat-hinh': 'Hoạt Hình',
-      'tv-shows': 'TV Shows',
-      'moi-nhat': 'Phim Mới Nhất'
-    };
+    const foundCategory = CATEGORIES.find(c => c.slug === category);
+    if (foundCategory) return `${foundCategory.icon} ${foundCategory.name}`;
     
-    if (mainCategories[category]) return mainCategories[category];
+    if (category === 'moi-nhat') return '🍿 Phim Mới Nhất';
     
     const genre = GENRES.find(g => g.slug === category);
     if (genre) return `Phim ${genre.name}`;
@@ -51,10 +47,10 @@ export default function CategoryPage() {
       setLoading(true);
       try {
         let resData;
-        if (category === 'moi-nhat') {
+        if (category === 'moi-nhat' || category === 'phim-moi-cap-nhat') {
           resData = await fetchMovies(page);
-          setMovies(resData.items || []);
-          const pagination = resData.pagination;
+          setMovies(resData.items || resData.data?.items || []);
+          const pagination = resData.pagination || resData.data?.params?.pagination;
           if (pagination) {
             const total = pagination.totalItems;
             const perPage = pagination.totalItemsPerPage;
@@ -80,8 +76,8 @@ export default function CategoryPage() {
           }
         } else {
           resData = await fetchCategoryMovies(category, page);
-          setMovies(resData.data?.items || []);
-          const pagination = resData.data?.params?.pagination;
+          setMovies(resData.data?.items || resData.items || []);
+          const pagination = resData.data?.params?.pagination || resData.pagination;
           if (pagination) {
             const total = pagination.totalItems;
             const perPage = pagination.totalItemsPerPage;
