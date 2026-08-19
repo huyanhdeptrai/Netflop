@@ -177,52 +177,59 @@ export const searchMovies = async (keyword: string, page = 1, limit = 24) => {
   const encKey = encodeURIComponent(cleanKeyword);
 
   try {
-    // Search both PhimAPI & NguonC simultaneously for exact keywords
-    const [phimApiRes, nguoncRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/v1/api/tim-kiem?keyword=${encKey}&page=${page}&limit=${limit}`).then(r => r.json()).catch(() => null),
-      fetch(`https://phim.nguonc.com/api/films/search?keyword=${encKey}`).then(r => r.json()).catch(() => null)
-    ]);
-
-    const combinedItems: Movie[] = [];
-    const seenSlugs = new Set<string>();
-
-    // 1. Add exact results from PhimAPI
+    // 1. Prioritize KKPhim (phimapi.com) search first
+    const phimApiRes = await fetch(`${API_BASE_URL}/v1/api/tim-kiem?keyword=${encKey}&page=${page}&limit=${limit}`).then(r => r.json()).catch(() => null);
     const phimApiList: Movie[] = phimApiRes?.data?.items || phimApiRes?.items || [];
-    for (const item of phimApiList) {
-      if (!seenSlugs.has(item.slug)) {
-        seenSlugs.add(item.slug);
-        combinedItems.push(item);
-      }
+
+    // If KKPhim already has results, return them immediately (no duplicate movies from NguonC)
+    if (phimApiList.length > 0) {
+      return phimApiRes;
     }
 
-    // 2. Add exact results from NguonC API
-    if (nguoncRes?.items && Array.isArray(nguoncRes.items)) {
-      for (const item of nguoncRes.items) {
-        if (!seenSlugs.has(item.slug)) {
-          seenSlugs.add(item.slug);
-          combinedItems.push({
-            _id: item.id,
-            name: item.name,
-            slug: item.slug,
-            origin_name: item.original_name || item.name,
-            thumb_url: item.thumb_url,
-            poster_url: item.poster_url,
-            year: item.created ? new Date(item.created).getFullYear() : 2024,
-            modified: {
-              time: item.modified || item.created || ''
-            }
-          });
+    // 2. Only if KKPhim returns no results or fails, fall back to NguonC search
+    const nguoncRes = await fetch(`https://phim.nguonc.com/api/films/search?keyword=${encKey}&page=${page}`).then(r => r.json()).catch(() => null);
+
+    if (nguoncRes?.items && Array.isArray(nguoncRes.items) && nguoncRes.items.length > 0) {
+      const nguoncItems: Movie[] = nguoncRes.items.map((item: any) => ({
+        _id: item.id,
+        name: item.name,
+        slug: item.slug,
+        origin_name: item.original_name || item.name,
+        thumb_url: item.thumb_url,
+        poster_url: item.poster_url,
+        year: item.created ? new Date(item.created).getFullYear() : 2024,
+        modified: {
+          time: item.modified || item.created || ''
         }
-      }
+      }));
+
+      const totalItems = nguoncRes.paginate?.total_items || nguoncItems.length;
+      const totalPages = nguoncRes.paginate?.total_page || 1;
+
+      return {
+        status: 'success',
+        data: {
+          items: nguoncItems,
+          params: {
+            pagination: {
+              totalItems,
+              totalItemsPerPage: limit,
+              currentPage: page,
+              totalPages
+            }
+          }
+        }
+      };
     }
 
-    return {
+    // Return empty results if neither has matching movies
+    return phimApiRes || {
       status: 'success',
       data: {
-        items: combinedItems,
+        items: [],
         params: {
           pagination: {
-            totalItems: combinedItems.length,
+            totalItems: 0,
             totalItemsPerPage: limit,
             currentPage: page,
             totalPages: 1
