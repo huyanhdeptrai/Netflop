@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies } from '../services/api';
-import { List, ChevronRight, Info, Sparkles, ChevronsRight } from 'lucide-react';
+import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
+import { List, ChevronRight, Info, Sparkles, ChevronsRight, Server, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHistory } from '../services/HistoryContext';
 import CommentSection from '../components/CommentSection';
@@ -22,7 +22,15 @@ export default function Watch() {
   const progressRef = useRef<number>(0);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const currentServer = movie?.episodes?.[currentSvIndex];
+  const currentServer = movie?.episodes?.[currentSvIndex] || movie?.episodes?.[0];
+  const activeServerGroup = currentServer?.server_group || 'Server 1';
+  const serverGroups = movie?.episodes
+    ? Array.from(new Set(movie.episodes.map(e => e.server_group || 'Server 1')))
+    : ['Server 1'];
+  const availableVersionsInGroup = (movie?.episodes || [])
+    .map((srv, idx) => ({ srv, idx }))
+    .filter(item => (item.srv.server_group || 'Server 1') === activeServerGroup);
+
   const episodes = currentServer?.server_data || [];
   const currentIndex = episodes.findIndex((ep: any) => ep.slug === currentEpisode?.slug);
   const nextEpisode = episodes[currentIndex + 1];
@@ -62,16 +70,26 @@ export default function Watch() {
         // Select episode and server
         if (movieData.episodes && movieData.episodes.length > 0) {
           const server = movieData.episodes[currentSvIndex] || movieData.episodes[0];
-          const ep = currentEpSlug 
-            ? server.server_data.find((e: any) => e.slug === currentEpSlug)
-            : server.server_data[0];
-          setCurrentEpisode(ep || server.server_data[0]);
+          let ep = null;
+          if (currentEpSlug) {
+            ep = server.server_data.find((e: any) => e.slug === currentEpSlug);
+            if (!ep) {
+              const cleanTarget = currentEpSlug.replace(/^tap-0*/i, '').replace(/^tap-/i, '').trim();
+              ep = server.server_data.find((e: any) => {
+                const cleanCurrent = (e.slug || '').replace(/^tap-0*/i, '').replace(/^tap-/i, '').trim();
+                const cleanName = cleanEpisodeName(e.name);
+                return cleanCurrent === cleanTarget || cleanName === cleanTarget;
+              });
+            }
+          }
+          const finalEp = ep || server.server_data[0];
+          setCurrentEpisode(finalEp);
 
           // Restore progress from history or URL
           const existing = history.find(h => h._id === movieData._id);
           if (timeParam) {
             progressRef.current = parseInt(timeParam);
-          } else if (existing && existing.episodeSlug === ep.slug) {
+          } else if (existing && existing.episodeSlug === finalEp?.slug) {
             progressRef.current = existing.currentTime;
           } else {
             progressRef.current = 0;
@@ -216,11 +234,11 @@ export default function Watch() {
           <ChevronRight size={12} />
           <Link to={`/movie/${movie.slug}`} className="hover:text-primary">{movie.name}</Link>
           <ChevronRight size={12} />
-          <span className="text-primary font-bold">Tập {currentEpisode.name}</span>
+          <span className="text-primary font-bold">{formatEpisodeDisplay(currentEpisode.name)}</span>
           {currentServer && (
             <>
               <ChevronRight size={12} />
-              <span className="text-text-muted">({currentServer.server_name})</span>
+              <span className="text-text-muted">({currentServer.server_group || 'Server 1'} - {currentServer.server_name})</span>
             </>
           )}
         </div>
@@ -258,29 +276,76 @@ export default function Watch() {
         </div>
 
         <div className="px-4 sm:px-0">
-          {/* Server/Version Selection below player */}
-          <div className="bg-surface p-3 sm:p-4 rounded-2xl border border-white/5 mb-6 sm:mb-8 flex flex-wrap items-center gap-3 sm:gap-4">
+          {/* Dual Selection: Server & Sub/Audio Format below player */}
+          <div className="bg-surface p-3 sm:p-4 rounded-2xl border border-white/5 mb-6 sm:mb-8 flex flex-wrap items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
               <span className="text-text-muted">Đang phát:</span>
-              <span className="text-primary">Tập {currentEpisode.name}</span>
+              <span className="text-primary">{formatEpisodeDisplay(currentEpisode.name)}</span>
             </div>
+
             <div className="h-4 w-px bg-white/10 hidden sm:block" />
-            <div className="flex flex-wrap gap-2">
-              {movie.episodes?.map((server, idx) => (
-                <Link
-                  key={server.server_name}
-                  to={`/watch/${movie.slug}?ep=${currentEpisode.slug}&sv=${idx}`}
-                  className={cn(
-                    "px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all border",
-                    currentSvIndex === idx 
-                      ? "bg-primary border-primary text-white shadow-[0_0_10px_rgba(229,9,127,0.3)]" 
-                      : "bg-background border-white/5 text-text-muted hover:text-white hover:border-primary/50"
-                  )}
-                >
-                  {server.server_name}
-                </Link>
-              ))}
+
+            {/* 1. Chọn Server (Server 1, Server 2) */}
+            <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
+              <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
+                <Server size={13} className="text-primary" />
+                Server:
+              </span>
+              <div className="flex gap-1.5">
+                {serverGroups.map((group) => {
+                  const isGroupActive = activeServerGroup === group;
+                  const targetIdx = movie.episodes.findIndex(
+                    s => (s.server_group || 'Server 1') === group && s.server_name === currentServer?.server_name
+                  );
+                  const destIndex = targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || 'Server 1') === group);
+                  const targetServer = movie.episodes[destIndex];
+                  const targetEpSlug = targetServer?.server_data?.find(
+                    (e: any) => cleanEpisodeName(e.name) === cleanEpisodeName(currentEpisode?.name)
+                  )?.slug || currentEpisode?.slug;
+
+                  return (
+                    <Link
+                      key={group}
+                      to={`/watch/${movie.slug}?ep=${targetEpSlug}&sv=${destIndex}`}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                        isGroupActive
+                          ? "bg-primary border-primary text-white shadow-[0_0_10px_rgba(229,9,127,0.3)]"
+                          : "bg-surface border-white/5 text-text-muted hover:text-white hover:border-primary/50"
+                      )}
+                    >
+                      {group}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* 2. Chọn Định dạng (Vietsub, Thuyết minh, Lồng tiếng...) */}
+            {availableVersionsInGroup.length > 0 && (
+              <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
+                <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
+                  <Volume2 size={13} className="text-primary" />
+                  Định dạng:
+                </span>
+                <div className="flex gap-1.5">
+                  {availableVersionsInGroup.map(({ srv, idx }) => (
+                    <Link
+                      key={idx}
+                      to={`/watch/${movie.slug}?ep=${currentEpisode.slug}&sv=${idx}`}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                        currentSvIndex === idx
+                          ? "bg-white/20 border-white text-white shadow-sm"
+                          : "bg-surface border-white/5 text-text-muted hover:text-white hover:border-primary/50"
+                      )}
+                    >
+                      {srv.server_name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -288,7 +353,9 @@ export default function Watch() {
             <div className="lg:col-span-2 space-y-6 sm:space-y-8">
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-black mb-1 sm:mb-2">{movie.name}</h1>
-                <p className="text-primary font-bold text-sm sm:text-base">Tập {currentEpisode.name} - {currentServer?.server_name}</p>
+                <p className="text-primary font-bold text-sm sm:text-base">
+                  {formatEpisodeDisplay(currentEpisode.name)} • {currentServer?.server_group || 'Server 1'} ({currentServer?.server_name})
+                </p>
               </div>
 
               {/* Episode Selection */}
@@ -309,7 +376,7 @@ export default function Watch() {
                           : "bg-background border-white/5 hover:border-primary/50"
                       )}
                     >
-                      {ep.name}
+                      {cleanEpisodeName(ep.name)}
                     </Link>
                   ))}
                 </div>

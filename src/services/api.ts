@@ -21,6 +21,18 @@ export interface Movie {
   };
 }
 
+export interface EpisodeServer {
+  server_group?: string; // "Server 1" | "Server 2"
+  server_name: string;   // "Vietsub" | "Thuyết minh" | "Lồng tiếng"
+  server_data: {
+    name: string;
+    slug: string;
+    filename: string;
+    link_embed: string;
+    link_m3u8: string;
+  }[];
+}
+
 export interface MovieDetail extends Movie {
   content: string;
   type: string;
@@ -36,17 +48,25 @@ export interface MovieDetail extends Movie {
   director: string[];
   category: { id: string; name: string; slug: string }[];
   country: { id: string; name: string; slug: string }[];
-  episodes: {
-    server_name: string;
-    server_data: {
-      name: string;
-      slug: string;
-      filename: string;
-      link_embed: string;
-      link_m3u8: string;
-    }[];
-  }[];
+  episodes: EpisodeServer[];
 }
+
+export const formatEpisodeDisplay = (name?: string | number) => {
+  if (!name) return '';
+  const str = String(name).trim();
+  if (str.toLowerCase().startsWith('tập')) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+  if (/^\d+$/.test(str)) {
+    return `Tập ${str}`;
+  }
+  return str;
+};
+
+export const cleanEpisodeName = (name?: string | number) => {
+  if (!name) return '';
+  return String(name).replace(/^tập\s*/i, '').trim();
+};
 
 export const getImageUrl = (url: string) => {
   if (!url) return 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=400&auto=format&fit=crop';
@@ -95,22 +115,29 @@ export const fetchMoviesV1 = async (page = 1) => {
 
 export const fetchMovieDetail = async (slug: string) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/phim/${slug}`);
-    const data = await res.json();
-    if (data.status === true || data.status === 'success' || data.movie) {
-      return data;
-    }
-  } catch (e) {
-    console.error('PhimAPI detail error:', e);
-  }
+    const [kkRes, nguoncRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/phim/${slug}`).then(r => r.json()).catch(() => null),
+      fetch(`https://phim.nguonc.com/api/film/${slug}`).then(r => r.json()).catch(() => null)
+    ]);
 
-  // Fallback to NguonC API if PhimAPI does not have this movie
-  try {
-    const resNguonc = await fetch(`https://phim.nguonc.com/api/film/${slug}`);
-    const dataNguonc = await resNguonc.json();
-    if (dataNguonc.status === 'success' && dataNguonc.movie) {
-      const m = dataNguonc.movie;
+    const hasKkphim = (kkRes?.status === true || kkRes?.status === 'success') && kkRes?.movie;
+    const hasNguonc = (nguoncRes?.status === 'success') && nguoncRes?.movie;
 
+    // Helper to clean audio/sub format label (e.g. "Vietsub #1" -> "Vietsub", "Thuyết minh #1" -> "Thuyết minh")
+    const cleanAudioLabel = (name: string) => {
+      if (!name) return 'Bản chuẩn';
+      let clean = name
+        .replace(/Server\s*\d+/gi, '')
+        .replace(/KKPhim|NguonC/gi, '')
+        .replace(/[\(\)\-]/g, '')
+        .replace(/#\d+/g, '')
+        .trim();
+      if (!clean || clean.length < 2) return 'Bản chuẩn';
+      return clean.charAt(0).toUpperCase() + clean.slice(1);
+    };
+
+    // Helper to extract NguonC categories and countries
+    const parseNguoncMeta = (m: any) => {
       const categories: { name: string; slug: string }[] = [];
       const countries: { name: string; slug: string }[] = [];
       if (m.category) {
@@ -123,9 +150,14 @@ export const fetchMovieDetail = async (slug: string) => {
           }
         });
       }
+      return { categories, countries };
+    };
 
-      const episodes = (m.episodes || []).map((srv: any) => ({
-        server_name: srv.server_name || 'NguonC',
+    // Helper to format NguonC episodes into uniform EpisodeServer format
+    const parseNguoncEpisodes = (episodesList: any[], groupName = 'Server 2') => {
+      return (episodesList || []).map((srv: any) => ({
+        server_group: groupName,
+        server_name: cleanAudioLabel(srv.server_name),
         server_data: (srv.items || []).map((ep: any) => ({
           name: ep.name,
           slug: ep.slug,
@@ -134,6 +166,45 @@ export const fetchMovieDetail = async (slug: string) => {
           link_m3u8: ep.m3u8 || ep.embed || ''
         }))
       }));
+    };
+
+    // Case 1: Both KKPhim and NguonC have the movie -> merge episode servers into Server 1 and Server 2
+    if (hasKkphim && hasNguonc) {
+      const kkEpisodes = (kkRes.episodes || []).map((srv: any) => ({
+        server_group: 'Server 1',
+        server_name: cleanAudioLabel(srv.server_name),
+        server_data: srv.server_data || []
+      }));
+
+      const nguoncEpisodes = parseNguoncEpisodes(nguoncRes.movie.episodes, 'Server 2');
+
+      return {
+        status: true,
+        movie: kkRes.movie,
+        episodes: [...kkEpisodes, ...nguoncEpisodes]
+      };
+    }
+
+    // Case 2: Only KKPhim has the movie
+    if (hasKkphim) {
+      const kkEpisodes = (kkRes.episodes || []).map((srv: any) => ({
+        server_group: 'Server 1',
+        server_name: cleanAudioLabel(srv.server_name),
+        server_data: srv.server_data || []
+      }));
+
+      return {
+        status: true,
+        movie: kkRes.movie,
+        episodes: kkEpisodes
+      };
+    }
+
+    // Case 3: Only NguonC has the movie
+    if (hasNguonc) {
+      const m = nguoncRes.movie;
+      const { categories, countries } = parseNguoncMeta(m);
+      const nguoncEpisodes = parseNguoncEpisodes(m.episodes, 'Server 1');
 
       return {
         status: true,
@@ -158,11 +229,11 @@ export const fetchMovieDetail = async (slug: string) => {
           category: categories,
           country: countries
         },
-        episodes
+        episodes: nguoncEpisodes
       };
     }
   } catch (e) {
-    console.error('NguonC detail error:', e);
+    console.error('Fetch movie detail error:', e);
   }
 
   return { status: false, msg: 'Không tìm thấy phim' };

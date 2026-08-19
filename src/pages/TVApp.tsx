@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, Film, Tv, Heart, LogOut, Play, Star, Calendar, Clock, Globe, ArrowLeft, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 
 interface TVAppProps {
@@ -1333,7 +1333,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                                   : 'bg-[#1c1c1c] border-white/5 text-white hover:border-primary/50'
                               }`}
                             >
-                              Tập {ep.name}
+                              {formatEpisodeDisplay(ep.name)}
                             </button>
                           );
                         })}
@@ -1366,7 +1366,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
             </button>
             <div className="text-right">
               <span className="text-lg font-black block">{selectedMovie?.name}</span>
-              <span className="text-sm text-primary font-bold">Đang Phát: Tập {activeEpisodeName}</span>
+              <span className="text-sm text-primary font-bold">Đang Phát: {formatEpisodeDisplay(activeEpisodeName)}</span>
             </div>
           </div>
 

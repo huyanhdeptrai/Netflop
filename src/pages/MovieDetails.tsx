@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie } from '../services/api';
-import { Play, Heart, Share2, Star, Calendar, Clock, Globe, Sparkles } from 'lucide-react';
+import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
+import { Play, Heart, Share2, Star, Calendar, Clock, Globe, Sparkles, Server, Volume2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useFavorites } from '../services/FavoritesContext';
 import { useHistory } from '../services/HistoryContext';
@@ -91,7 +91,15 @@ export default function MovieDetails() {
   if (!movie) return <div className="pt-24 text-center">Không tìm thấy phim.</div>;
 
   const favorited = isFavorite(movie._id);
-  const currentServer = movie.episodes?.[selectedServerIndex];
+  const currentServer = movie.episodes?.[selectedServerIndex] || movie.episodes?.[0];
+  const activeServerGroup = currentServer?.server_group || 'Server 1';
+  const serverGroups = movie.episodes
+    ? Array.from(new Set(movie.episodes.map(e => e.server_group || 'Server 1')))
+    : ['Server 1'];
+  const availableVersionsInGroup = (movie.episodes || [])
+    .map((srv, idx) => ({ srv, idx }))
+    .filter(item => (item.srv.server_group || 'Server 1') === activeServerGroup);
+
   const historyItem = history.find(item => item.slug === slug);
 
   let watchButtonText = "XEM PHIM";
@@ -102,7 +110,7 @@ export default function MovieDetails() {
       watchButtonText = "XEM LẠI TỪ ĐẦU";
     } else {
       const epName = historyItem.episodeName || '1';
-      const displayEp = epName.toLowerCase().startsWith('tập') ? epName : `Tập ${epName}`;
+      const displayEp = formatEpisodeDisplay(epName);
       watchButtonText = `TIẾP TỤC XEM: ${displayEp}`;
       watchLink = `/watch/${movie.slug}?ep=${historyItem.episodeSlug || ''}&sv=${selectedServerIndex}&t=${Math.floor(historyItem.currentTime || 0)}`;
     }
@@ -291,28 +299,71 @@ export default function MovieDetails() {
         {/* Episodes Section */}
         {movie.episodes && movie.episodes.length > 0 && (
           <section className="mt-16">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-              <h3 className="text-2xl font-bold flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 bg-surface/40 p-4 rounded-2xl border border-white/5">
+              <h3 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-6 bg-primary rounded-full" />
                 Danh sách tập phim
               </h3>
               
-              {/* Version Selection Tabs */}
-              <div className="flex flex-wrap gap-2">
-                {movie.episodes.map((server, idx) => (
-                  <button
-                    key={server.server_name}
-                    onClick={() => setSelectedServerIndex(idx)}
-                    className={cn(
-                      "px-6 py-2 rounded-full text-sm font-bold transition-all duration-300 border",
-                      selectedServerIndex === idx 
-                        ? "bg-primary border-primary text-white shadow-[0_0_15px_rgba(229,9,127,0.4)]" 
-                        : "bg-[#2B2B2B] border-white/5 text-text-muted hover:text-white hover:border-primary/50"
-                    )}
-                  >
-                    {server.server_name}
-                  </button>
-                ))}
+              {/* Dual Selection: 1. Server, 2. Format */}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                {/* 1. Chọn Server (Server 1 / Server 2) */}
+                <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
+                  <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
+                    <Server size={13} className="text-primary" />
+                    Server:
+                  </span>
+                  <div className="flex gap-1.5">
+                    {serverGroups.map((group) => {
+                      const isGroupActive = activeServerGroup === group;
+                      return (
+                        <button
+                          key={group}
+                          onClick={() => {
+                            const targetIdx = movie.episodes.findIndex(
+                              s => (s.server_group || 'Server 1') === group && s.server_name === currentServer?.server_name
+                            );
+                            setSelectedServerIndex(targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || 'Server 1') === group));
+                          }}
+                          className={cn(
+                            "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                            isGroupActive
+                              ? "bg-primary border-primary text-white shadow-[0_0_10px_rgba(229,9,127,0.3)]"
+                              : "bg-surface border-white/5 text-text-muted hover:text-white hover:border-primary/50"
+                          )}
+                        >
+                          {group}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Chọn Định dạng (Vietsub, Thuyết minh, Lồng tiếng...) */}
+                {availableVersionsInGroup.length > 0 && (
+                  <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
+                    <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
+                      <Volume2 size={13} className="text-primary" />
+                      Định dạng:
+                    </span>
+                    <div className="flex gap-1.5">
+                      {availableVersionsInGroup.map(({ srv, idx }) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedServerIndex(idx)}
+                          className={cn(
+                            "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                            selectedServerIndex === idx
+                              ? "bg-white/20 border-white text-white shadow-sm"
+                              : "bg-surface border-white/5 text-text-muted hover:text-white hover:border-primary/50"
+                          )}
+                        >
+                          {srv.server_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -337,7 +388,7 @@ export default function MovieDetails() {
                     {isCurrent && (
                       <div className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full m-1 animate-pulse" />
                     )}
-                    {ep.name}
+                    {cleanEpisodeName(ep.name)}
                   </Link>
                 );
               })}

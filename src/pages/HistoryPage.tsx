@@ -4,6 +4,7 @@ import MovieCard from '../components/MovieCard';
 import { History, Trash2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatEpisodeDisplay } from '../services/api';
 
 export default function HistoryPage() {
   const { history, removeFromHistory, clearHistory } = useHistory();
@@ -54,7 +55,7 @@ export default function HistoryPage() {
                 <div className="mt-1 mb-2 px-1">
                   <p className="text-[10px] text-primary font-medium">
                     {item.isSeries ? (
-                      <>Đang xem: <span className="text-white">Tập {item.episodeName}</span> {item.serverName && <span className="text-[10px] opacity-50">({item.serverName})</span>}</>
+                      <>Đang xem: <span className="text-white">{formatEpisodeDisplay(item.episodeName)}</span> {item.serverName && <span className="text-[10px] opacity-50">({item.serverName})</span>}</>
                     ) : (
                       <>{`Còn lại ${Math.max(0, Math.round((item.duration - item.currentTime) / 60))} phút`} {item.serverName && <span className="text-[10px] opacity-50">({item.serverName})</span>}</>
                     )}

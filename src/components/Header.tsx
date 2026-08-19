@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight, Tv } from 'lucide-react';
-import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES, CATEGORIES } from '../services/api';
+import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES, CATEGORIES, formatEpisodeDisplay } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -304,7 +304,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                                   <h4 className="text-xs font-bold truncate group-hover:text-primary transition-colors">{item.name}</h4>
                                   <p className="text-[10px] text-text-muted mt-1">
                                     {item.isSeries ? (
-                                      <>Tập {item.episodeName} {item.serverName && <span className="opacity-60">({item.serverName})</span>}</>
+                                      <>{formatEpisodeDisplay(item.episodeName)} {item.serverName && <span className="opacity-60">({item.serverName})</span>}</>
                                     ) : (
                                       <>{`Còn ${Math.max(0, Math.round((item.duration - item.currentTime) / 60))} phút`} {item.serverName && <span className="opacity-60">({item.serverName})</span>}</>
                                     )}

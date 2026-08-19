@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchMovies, fetchCategoryMovies, Movie, CATEGORIES, getImageUrl, handleImageError } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, Movie, CATEGORIES, getImageUrl, handleImageError, formatEpisodeDisplay } from '../services/api';
 import MovieCard from '../components/MovieCard';
 import { ChevronRight, ChevronLeft, Play, Info, Sparkles, Flame, Film, Tv, Radio, Clock, Mic, MessageSquare } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -227,7 +227,7 @@ export default function Home() {
                         </p>
                         <p className="text-[11px] text-primary font-medium">
                           {movie.isSeries ? (
-                            <>Đang xem: <span className="text-white">Tập {movie.episodeName}</span> {movie.serverName && <span className="text-[10px] opacity-50">({movie.serverName})</span>}</>
+                            <>Đang xem: <span className="text-white">{formatEpisodeDisplay(movie.episodeName)}</span> {movie.serverName && <span className="text-[10px] opacity-50">({movie.serverName})</span>}</>
                           ) : (
                             <>{`Còn lại ${Math.max(0, Math.round((movie.duration - movie.currentTime) / 60))} phút`} {movie.serverName && <span className="text-[10px] opacity-50">({movie.serverName})</span>}</>
                           )}
