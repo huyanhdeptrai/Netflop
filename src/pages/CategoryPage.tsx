@@ -24,9 +24,9 @@ export default function CategoryPage() {
     if (!category) return 'Danh mục';
     
     const foundCategory = CATEGORIES.find(c => c.slug === category);
-    if (foundCategory) return `${foundCategory.icon} ${foundCategory.name}`;
+    if (foundCategory) return foundCategory.name;
     
-    if (category === 'moi-nhat') return '🍿 Phim Mới Nhất';
+    if (category === 'moi-nhat' || category === 'phim-moi-cap-nhat') return 'Phim Mới Nhất';
     
     const genre = GENRES.find(g => g.slug === category);
     if (genre) return `Phim ${genre.name}`;

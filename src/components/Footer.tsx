@@ -13,7 +13,7 @@ export default function Footer() {
               NETFLOP
             </Link>
             <p className="text-[#B3B3B3] text-sm leading-relaxed">
-              Nền tảng xem phim trực tuyến miễn phí đầu hàng Việt Nam cùng với lời khẳng định "netflix đ có tuổi". 
+              Nền tảng xem phim trực tuyến miễn phí đầu hàng Việt Nam cùng với lời khẳng định "netflix không có tuổi". 
               Tôi cam kết sẽ mang đến chất lượng tệ nhất cho người dùng.
             </p>
             <div className="text-sm text-[#B3B3B3]">

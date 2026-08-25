@@ -136,7 +136,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              🍿 Phim Mới Cập Nhật
+              Phim Mới Cập Nhật
             </h2>
             <Link to="/category/phim-moi-cap-nhat" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
               Xem tất cả <ChevronRight size={16} />
@@ -247,7 +247,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-8 bg-primary rounded-full" />
-                ⚡ Phim Bộ Đang Chiếu Hot
+                Phim Bộ Đang Chiếu Hot
               </h2>
               <Link to="/category/phim-bo-dang-chieu" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
                 Xem tất cả <ChevronRight size={16} />
@@ -267,7 +267,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-8 bg-primary rounded-full" />
-                💬 Phim Vietsub Mới
+                Phim Vietsub Mới
               </h2>
               <Link to="/category/phim-vietsub" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
                 Xem tất cả <ChevronRight size={16} />
@@ -287,7 +287,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-8 bg-primary rounded-full" />
-                🎙️ Phim Thuyết Minh & Lồng Tiếng
+                Phim Thuyết Minh & Lồng Tiếng
               </h2>
               <Link to="/category/phim-thuyet-minh" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
                 Xem tất cả <ChevronRight size={16} />
@@ -306,7 +306,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              📺 Phim Bộ Nổi Bật
+              Phim Bộ Nổi Bật
             </h2>
             <Link to="/category/phim-bo" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
               Xem tất cả <ChevronRight size={16} />
@@ -324,7 +324,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              🎬 Phim Lẻ Mới
+              Phim Lẻ Mới
             </h2>
             <Link to="/category/phim-le" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
               Xem tất cả <ChevronRight size={16} />
@@ -343,7 +343,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-8 bg-primary rounded-full" />
-                ⏰ Phim Sắp Chiếu
+                Phim Sắp Chiếu
               </h2>
               <Link to="/category/phim-sap-chieu" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
                 Xem tất cả <ChevronRight size={16} />
@@ -362,7 +362,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <span className="w-1 h-8 bg-primary rounded-full" />
-              🦄 Hoạt Hình Đặc Sắc
+              Hoạt Hình Đặc Sắc
             </h2>
             <Link to="/category/hoat-hinh" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
               Xem tất cả <ChevronRight size={16} />
@@ -381,7 +381,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <span className="w-1 h-8 bg-primary rounded-full" />
-                🎭 TV Shows Giải Trí
+                TV Shows Giải Trí
               </h2>
               <Link to="/category/tv-shows" className="text-primary text-sm font-bold hover:underline flex items-center gap-1">
                 Xem tất cả <ChevronRight size={16} />
