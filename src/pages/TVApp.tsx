@@ -3,6 +3,7 @@ import { Search, Home, Film, Tv, Heart, LogOut, Play, Star, Calendar, Clock, Glo
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
+import '../tv.css';
 
 interface TVAppProps {
   setTvMode: (mode: boolean) => void;
@@ -782,7 +783,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
   ];
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-white font-sans overflow-hidden select-none relative">
+    <div id="tv-root" className="bg-[#0a0a0a] min-h-screen text-white font-sans overflow-hidden select-none relative">
       {/* Background Poster Trailer Blur Background */}
       <div className="absolute top-0 right-0 w-[80vw] h-[75vh] opacity-25 pointer-events-none transition-all duration-1000">
         {heroMovie && (
@@ -803,12 +804,13 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         
         {/* Left Sidebar Menu (Netflix TV style) */}
         <aside 
+          id="tv-sidebar"
           className={`flex flex-col bg-[#050505] border-r border-white/5 h-full z-30 transition-all duration-300 shrink-0 ${
             currentSection === 'sidebar' ? 'w-[260px] shadow-2xl shadow-primary/10' : 'w-[76px]'
           }`}
         >
           {/* Netflop Logo */}
-          <div className="p-6 flex items-center justify-center border-b border-white/5 h-20 shrink-0 overflow-hidden">
+          <div id="tv-sidebar-logo" className="p-6 flex items-center justify-center border-b border-white/5 h-20 shrink-0 overflow-hidden">
             <span className={`font-black text-primary tracking-tighter transition-all duration-300 ${
               currentSection === 'sidebar' ? 'text-3xl' : 'text-lg'
             }`}>
@@ -828,16 +830,12 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                 <button
                   key={idx}
                   onClick={() => handleSidebarSelect(idx)}
-                  className={`flex items-center transition-all duration-300 outline-none rounded-xl ${
+                  className={`tv-nav-btn flex items-center transition-all duration-300 outline-none rounded-xl ${
+                    isFocused ? 'tv-focused' : isSelected ? 'tv-selected' : ''
+                  } ${
                     isSidebarExpanded 
                       ? 'gap-4 py-3 px-4 text-left w-full' 
                       : 'justify-center p-2.5 w-11 h-11 mx-auto'
-                  } ${
-                    isFocused 
-                      ? 'bg-primary text-white scale-110 shadow-[0_0_20px_rgba(229,9,127,0.5)]' 
-                      : isSelected
-                        ? 'bg-white/10 text-white font-bold'
-                        : 'text-text-muted hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <Icon size={20} className={`shrink-0 ${isFocused ? 'animate-pulse' : ''}`} />
@@ -855,13 +853,13 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         </aside>
 
         {/* Content Showcase Panel */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#0a0a0a]">
+        <main id="tv-main" className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#0a0a0a]">
           
           {/* SEARCH PAGE VIEW WITH VIRTUAL KEYBOARD */}
           {currentSection === 'search' && (
-            <div className="flex-1 flex bg-[#0c0c0c] z-20 overflow-hidden h-full">
+            <div id="tv-search-page" className="flex-1 flex bg-[#0c0c0c] z-20 overflow-hidden h-full">
               {/* Left Side: Virtual Keyboard */}
-              <div className="w-[360px] border-r border-white/5 bg-[#080808] p-8 flex flex-col shrink-0 h-full justify-between">
+              <div id="tv-keyboard-panel" className="w-[360px] border-r border-white/5 bg-[#080808] p-8 flex flex-col shrink-0 h-full justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-6">
                     <Search className="text-primary animate-pulse" size={24} />
@@ -888,12 +886,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                           key={key}
                           id={`tv-key-${kIdx}`}
                           onClick={() => handleVirtualKeyPress(key)}
-                          className={`h-11 rounded-lg font-black text-xs transition-all duration-200 outline-none flex items-center justify-center ${
-                            isFocused
-                              ? 'bg-primary text-white scale-110 shadow-[0_0_15px_rgba(229,9,127,0.8)] border border-white'
-                              : isSpecial
-                                ? 'bg-white/10 text-white hover:bg-white/15'
-                                : 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                          className={`tv-key-btn h-11 rounded-lg font-black text-xs transition-all duration-200 outline-none flex items-center justify-center ${
+                            isFocused ? 'tv-focused' : isSpecial ? 'tv-special' : ''
                           } ${
                             key === 'SPACE' ? 'col-span-2' : ''
                           } ${
@@ -984,7 +978,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
 
           {/* GENRES GRID VIEW */}
           {currentSection === 'genres_grid' && (
-            <div className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
+            <div id="tv-genres-page" className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
               <h1 className="text-3xl font-black mb-8 flex items-center gap-3">
                 <Film className="text-primary animate-pulse" size={28} />
                 DUYỆT THEO THỂ LOẠI
@@ -998,10 +992,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                       key={genre.slug}
                       id={`tv-genre-${idx}`}
                       onClick={() => handleGenreSelect(genre.slug, genre.name)}
-                      className={`py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left border-2 ${
-                        isFocused
-                          ? 'bg-primary border-white text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.8)]'
-                          : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                      className={`tv-grid-btn py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left ${
+                        isFocused ? 'tv-focused' : ''
                       }`}
                     >
                       {genre.name}
@@ -1014,7 +1006,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
 
           {/* COUNTRIES GRID VIEW */}
           {currentSection === 'countries_grid' && (
-            <div className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
+            <div id="tv-countries-page" className="flex-1 flex flex-col p-12 bg-[#0c0c0c] z-20 overflow-y-auto h-full">
               <h1 className="text-3xl font-black mb-8 flex items-center gap-3">
                 <Globe className="text-primary animate-pulse" size={28} />
                 DUYỆT THEO QUỐC GIA
@@ -1028,10 +1020,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                       key={country.slug}
                       id={`tv-country-${idx}`}
                       onClick={() => handleCountrySelect(country.slug, country.name)}
-                      className={`py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left border-2 ${
-                        isFocused
-                          ? 'bg-primary border-white text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.8)]'
-                          : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10 hover:text-white'
+                      className={`tv-grid-btn py-5 px-6 rounded-2xl text-lg font-black transition-all duration-200 outline-none text-left ${
+                        isFocused ? 'tv-focused' : ''
                       }`}
                     >
                       {country.name}
@@ -1140,10 +1130,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                               <div
                                 key={movie._id}
                                 onClick={() => openMovieDetails(movie.slug)}
-                                className={`w-[180px] shrink-0 aspect-[2/3] rounded-xl overflow-hidden bg-surface relative cursor-pointer border-2 transition-all duration-300 ${
-                                  isFocused 
-                                    ? 'scale-105 border-primary shadow-[0_0_20px_rgba(229,9,127,0.8)] z-10' 
-                                    : 'border-white/5 hover:border-white/20'
+                                className={`tv-movie-card w-[180px] shrink-0 aspect-[2/3] rounded-xl overflow-hidden bg-surface relative cursor-pointer border-2 transition-all duration-300 ${
+                                  isFocused ? 'tv-focused' : ''
                                 }`}
                               >
                                 <img
@@ -1192,15 +1180,16 @@ export default function TVApp({ setTvMode }: TVAppProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            id="tv-modal-overlay"
             className="fixed inset-0 bg-black/95 z-40 flex items-center justify-center p-12"
           >
             {modalLoading ? (
               <div className="flex flex-col items-center gap-4">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent" />
+                <div className="tv-spinner animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent" />
                 <p className="text-lg font-bold text-text-muted">Đang tải phim, chờ xíu bro...</p>
               </div>
             ) : (
-              <div className="max-w-6xl w-full bg-[#141414] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col md:flex-row h-[85vh]">
+              <div id="tv-modal-inner" className="max-w-6xl w-full bg-[#141414] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col md:flex-row h-[85vh]">
                 
                 {/* Modal Poster Background Side */}
                 <div className="md:w-1/3 aspect-[2/3] relative h-full shrink-0">
@@ -1279,10 +1268,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                     {/* Action Buttons */}
                     <div className="flex gap-4">
                       <button
-                        className={`px-8 py-4 rounded-xl text-lg font-black flex items-center gap-3 transition-all outline-none ${
-                          modalFocus === 'play'
-                            ? 'bg-primary text-white scale-105 shadow-[0_0_20px_rgba(229,9,127,0.8)] border-2 border-white'
-                            : 'bg-primary/95 text-white'
+                        className={`tv-btn-play px-8 py-4 rounded-xl text-lg font-black flex items-center gap-3 transition-all outline-none ${
+                          modalFocus === 'play' ? 'tv-focused' : ''
                         }`}
                       >
                         <Play size={24} fill="currentColor" />
@@ -1290,10 +1277,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                       </button>
 
                       <button
-                        className={`px-8 py-4 rounded-xl text-lg font-black flex items-center gap-3 transition-all outline-none ${
-                          modalFocus === 'favorite'
-                            ? 'bg-white text-black scale-105 shadow-[0_0_20px_rgba(255,255,255,0.4)] border-2 border-primary'
-                            : 'bg-white/10 text-white'
+                        className={`tv-btn-fav px-8 py-4 rounded-xl text-lg font-black flex items-center gap-3 transition-all outline-none ${
+                          modalFocus === 'favorite' ? 'tv-focused' : ''
                         }`}
                       >
                         {favorites.some(f => f._id === selectedMovie._id) ? (
@@ -1327,10 +1312,8 @@ export default function TVApp({ setTvMode }: TVAppProps) {
                               key={idx}
                               id={`tv-episode-${idx}`}
                               onClick={() => playEpisode(ep.link_embed, ep.name)}
-                              className={`py-3 px-2 rounded-xl font-bold text-sm transition-all outline-none border ${
-                                isFocused
-                                  ? 'bg-primary border-white text-white scale-105 shadow-[0_0_15px_rgba(229,9,127,0.6)]'
-                                  : 'bg-[#1c1c1c] border-white/5 text-white hover:border-primary/50'
+                              className={`tv-episode-btn py-3 px-2 rounded-xl font-bold text-sm transition-all outline-none ${
+                                isFocused ? 'tv-focused' : ''
                               }`}
                             >
                               {formatEpisodeDisplay(ep.name)}
@@ -1351,7 +1334,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
 
       {/* FULL-SCREEN TV CINEMA PLAYER */}
       {currentSection === 'player' && activePlayerUrl && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        <div id="tv-player" className="fixed inset-0 bg-black z-50 flex flex-col">
           {/* Top control bar overlay */}
           <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black to-transparent p-6 z-10 flex items-center justify-between">
             <button 
