@@ -855,7 +855,7 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         </aside>
 
         {/* Content Showcase Panel */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#0a0a0a]/40 backdrop-blur-xl">
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#0a0a0a]">
           
           {/* SEARCH PAGE VIEW WITH VIRTUAL KEYBOARD */}
           {currentSection === 'search' && (
