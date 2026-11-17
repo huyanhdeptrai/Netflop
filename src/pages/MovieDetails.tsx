@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
+import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL, SERVER_HINTS } from '../services/api';
 import { Play, Heart, Share2, Star, Calendar, Clock, Globe, Sparkles, Server, Volume2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useFavorites } from '../services/FavoritesContext';
@@ -92,13 +92,13 @@ export default function MovieDetails() {
 
   const favorited = isFavorite(movie._id);
   const currentServer = movie.episodes?.[selectedServerIndex] || movie.episodes?.[0];
-  const activeServerGroup = currentServer?.server_group || 'Server 1';
+  const activeServerGroup = currentServer?.server_group || DEFAULT_SERVER_LABEL;
   const serverGroups = movie.episodes
-    ? Array.from(new Set(movie.episodes.map(e => e.server_group || 'Server 1')))
-    : ['Server 1'];
+    ? Array.from(new Set(movie.episodes.map(e => e.server_group || DEFAULT_SERVER_LABEL)))
+    : [DEFAULT_SERVER_LABEL];
   const availableVersionsInGroup = (movie.episodes || [])
     .map((srv, idx) => ({ srv, idx }))
-    .filter(item => (item.srv.server_group || 'Server 1') === activeServerGroup);
+    .filter(item => (item.srv.server_group || DEFAULT_SERVER_LABEL) === activeServerGroup);
 
   const historyItem = history.find(item => item.slug === slug);
 
@@ -311,7 +311,7 @@ export default function MovieDetails() {
               
               {/* Dual Selection: 1. Server, 2. Format */}
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                {/* 1. Chọn Server (Server 1 / Server 2) */}
+                {/* 1. Chọn Server (Chính thất / Hiền Hồ / VF3) */}
                 <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
                   <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
                     <Server size={13} className="text-primary" />
@@ -323,11 +323,12 @@ export default function MovieDetails() {
                       return (
                         <button
                           key={group}
+                          title={SERVER_HINTS[String(group)]}
                           onClick={() => {
                             const targetIdx = movie.episodes.findIndex(
-                              s => (s.server_group || 'Server 1') === group && s.server_name === currentServer?.server_name
+                              s => (s.server_group || DEFAULT_SERVER_LABEL) === group && s.server_name === currentServer?.server_name
                             );
-                            setSelectedServerIndex(targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || 'Server 1') === group));
+                            setSelectedServerIndex(targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || DEFAULT_SERVER_LABEL) === group));
                           }}
                           className={cn(
                             "px-3 py-1 rounded-lg text-xs font-bold transition-all border",

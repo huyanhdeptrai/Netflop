@@ -21,6 +21,22 @@ const KK_IMAGE_CDN = 'https://phimimg.com';
 
 export type MovieSource = 'kkphim' | 'nguonc' | 'vsmov';
 
+/** Tên server hiển thị, cố định theo từng nguồn */
+export const SERVER_LABELS: Record<MovieSource, string> = {
+  kkphim: 'Chính thất',
+  nguonc: 'Hiền Hồ',
+  vsmov: 'VF3',
+};
+
+/** Ghi chú hiện khi rê chuột vào nút server */
+export const SERVER_HINTS: Record<string, string> = {
+  [SERVER_LABELS.kkphim]: 'Server chính (KKPhim)',
+  [SERVER_LABELS.nguonc]: 'Server phụ (NguonC)',
+  [SERVER_LABELS.vsmov]: 'Ổn định, có tua intro (VSMov)',
+};
+
+export const DEFAULT_SERVER_LABEL = SERVER_LABELS.kkphim;
+
 export interface TmdbInfo {
   id?: string | number | null;
   type?: string | null;
@@ -495,7 +511,7 @@ export const searchMovies = async (keyword: string, page = 1, limit = 24) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Chi tiết phim: KKPhim (Server 1) + NguonC (Server 2) + VSMov (3)   */
+/*  Chi tiết phim: Chính thất (KKPhim) + Hiền Hồ (NguonC) + VF3 (VSMov) */
 /* ------------------------------------------------------------------ */
 
 const DETAIL_TTL = 10 * 60 * 1000;
@@ -760,10 +776,9 @@ async function loadMovieDetail(slug: string): Promise<DetailResult> {
   // Giữ đúng slug người dùng truy cập để URL / lịch sử / yêu thích ổn định
   movie = { ...movie, slug };
 
-  // 5. Server đánh số theo thứ tự nguồn (KKPhim luôn trước) -> chỉ số `sv` trên URL ổn định
-  const groups = found.map((d) => dedupeLabels(d.servers)).filter((g) => g.length > 0);
-  const episodes: EpisodeServer[] = groups.flatMap((group, i) =>
-    group.map((srv) => ({ ...srv, server_group: `Server ${i + 1}` }))
+  // 5. Tên server cố định theo nguồn; KKPhim luôn đứng trước -> chỉ số `sv` trên URL ổn định
+  const episodes: EpisodeServer[] = found.flatMap((d) =>
+    dedupeLabels(d.servers).map((srv) => ({ ...srv, server_group: SERVER_LABELS[d.source] }))
   );
   const sources = Array.from(new Set(episodes.map((e) => e.source!))) as MovieSource[];
 

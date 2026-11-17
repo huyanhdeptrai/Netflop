@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
+import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL, SERVER_HINTS } from '../services/api';
 import { List, ChevronRight, Info, Sparkles, ChevronsRight, Server, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHistory } from '../services/HistoryContext';
@@ -24,13 +24,13 @@ export default function Watch() {
   const loadedSlugRef = useRef<string | null>(null);
 
   const currentServer = movie?.episodes?.[currentSvIndex] || movie?.episodes?.[0];
-  const activeServerGroup = currentServer?.server_group || 'Server 1';
+  const activeServerGroup = currentServer?.server_group || DEFAULT_SERVER_LABEL;
   const serverGroups = movie?.episodes
-    ? Array.from(new Set(movie.episodes.map(e => e.server_group || 'Server 1')))
-    : ['Server 1'];
+    ? Array.from(new Set(movie.episodes.map(e => e.server_group || DEFAULT_SERVER_LABEL)))
+    : [DEFAULT_SERVER_LABEL];
   const availableVersionsInGroup = (movie?.episodes || [])
     .map((srv, idx) => ({ srv, idx }))
-    .filter(item => (item.srv.server_group || 'Server 1') === activeServerGroup);
+    .filter(item => (item.srv.server_group || DEFAULT_SERVER_LABEL) === activeServerGroup);
 
   const episodes = currentServer?.server_data || [];
   const currentIndex = episodes.findIndex((ep: any) => ep.slug === currentEpisode?.slug);
@@ -256,7 +256,7 @@ export default function Watch() {
           {currentServer && (
             <>
               <ChevronRight size={12} />
-              <span className="text-text-muted">({currentServer.server_group || 'Server 1'} - {currentServer.server_name})</span>
+              <span className="text-text-muted">({currentServer.server_group || DEFAULT_SERVER_LABEL} - {currentServer.server_name})</span>
             </>
           )}
         </div>
@@ -303,7 +303,7 @@ export default function Watch() {
 
             <div className="h-4 w-px bg-white/10 hidden sm:block" />
 
-            {/* 1. Chọn Server (Server 1, Server 2) */}
+            {/* 1. Chọn Server (Chính thất / Hiền Hồ / VF3) */}
             <div className="flex items-center gap-2 bg-[#1A1A1A] px-3 py-1.5 rounded-xl border border-white/5">
               <span className="text-text-muted text-xs font-semibold flex items-center gap-1">
                 <Server size={13} className="text-primary" />
@@ -313,9 +313,9 @@ export default function Watch() {
                 {serverGroups.map((group) => {
                   const isGroupActive = activeServerGroup === group;
                   const targetIdx = movie.episodes.findIndex(
-                    s => (s.server_group || 'Server 1') === group && s.server_name === currentServer?.server_name
+                    s => (s.server_group || DEFAULT_SERVER_LABEL) === group && s.server_name === currentServer?.server_name
                   );
-                  const destIndex = targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || 'Server 1') === group);
+                  const destIndex = targetIdx !== -1 ? targetIdx : movie.episodes.findIndex(s => (s.server_group || DEFAULT_SERVER_LABEL) === group);
                   const targetServer = movie.episodes[destIndex];
                   const targetEpSlug = targetServer?.server_data?.find(
                     (e: any) => cleanEpisodeName(e.name) === cleanEpisodeName(currentEpisode?.name)
@@ -324,6 +324,7 @@ export default function Watch() {
                   return (
                     <Link
                       key={group}
+                      title={SERVER_HINTS[String(group)]}
                       to={`/watch/${movie.slug}?ep=${targetEpSlug}&sv=${destIndex}`}
                       className={cn(
                         "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
@@ -372,7 +373,7 @@ export default function Watch() {
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-black mb-1 sm:mb-2">{movie.name}</h1>
                 <p className="text-primary font-bold text-sm sm:text-base">
-                  {formatEpisodeDisplay(currentEpisode.name)} • {currentServer?.server_group || 'Server 1'} ({currentServer?.server_name})
+                  {formatEpisodeDisplay(currentEpisode.name)} • {currentServer?.server_group || DEFAULT_SERVER_LABEL} ({currentServer?.server_name})
                 </p>
               </div>
 
