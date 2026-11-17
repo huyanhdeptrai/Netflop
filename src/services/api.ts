@@ -25,14 +25,7 @@ export type MovieSource = 'kkphim' | 'nguonc' | 'vsmov';
 export const SERVER_LABELS: Record<MovieSource, string> = {
   kkphim: 'Chính thất',
   nguonc: 'Hiền Hồ',
-  vsmov: 'VF3',
-};
-
-/** Ghi chú hiện khi rê chuột vào nút server */
-export const SERVER_HINTS: Record<string, string> = {
-  [SERVER_LABELS.kkphim]: 'Server chính (KKPhim)',
-  [SERVER_LABELS.nguonc]: 'Server phụ (NguonC)',
-  [SERVER_LABELS.vsmov]: 'Ổn định, có tua intro (VSMov)',
+  vsmov: 'VF3 (khá ổn, có tua intro)',
 };
 
 export const DEFAULT_SERVER_LABEL = SERVER_LABELS.kkphim;

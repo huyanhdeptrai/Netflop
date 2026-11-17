@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL, SERVER_HINTS } from '../services/api';
+import { fetchMovieDetail, MovieDetail, getImageUrl, handleImageError, cn, fetchGenreMovies, fetchCategoryMovies, fetchMovies, Movie, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL } from '../services/api';
 import { Play, Heart, Share2, Star, Calendar, Clock, Globe, Sparkles, Server, Volume2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useFavorites } from '../services/FavoritesContext';
@@ -323,7 +323,6 @@ export default function MovieDetails() {
                       return (
                         <button
                           key={group}
-                          title={SERVER_HINTS[String(group)]}
                           onClick={() => {
                             const targetIdx = movie.episodes.findIndex(
                               s => (s.server_group || DEFAULT_SERVER_LABEL) === group && s.server_name === currentServer?.server_name

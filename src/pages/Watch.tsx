@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL, SERVER_HINTS } from '../services/api';
+import { fetchMovieDetail, MovieDetail, cn, fetchCategoryMovies, Movie, getImageUrl, handleImageError, fetchGenreMovies, fetchMovies, formatEpisodeDisplay, cleanEpisodeName, DEFAULT_SERVER_LABEL } from '../services/api';
 import { List, ChevronRight, Info, Sparkles, ChevronsRight, Server, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useHistory } from '../services/HistoryContext';
@@ -324,7 +324,6 @@ export default function Watch() {
                   return (
                     <Link
                       key={group}
-                      title={SERVER_HINTS[String(group)]}
                       to={`/watch/${movie.slug}?ep=${targetEpSlug}&sv=${destIndex}`}
                       className={cn(
                         "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
