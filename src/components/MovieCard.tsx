@@ -38,10 +38,21 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie, onRemove, progress }) => {
           </button>
         )}
 
-        {/* Audio Label Mockup */}
-        <div className="absolute top-2 left-2 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
-          Vietsub
-        </div>
+        {/* Nhãn ngôn ngữ / tập hiện tại lấy từ API */}
+        {(movie.lang || movie.episode_current) && (
+          <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1 pointer-events-none">
+            {movie.lang && (
+              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase max-w-full truncate">
+                {movie.lang}
+              </span>
+            )}
+            {movie.episode_current && (
+              <span className="bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded max-w-full truncate">
+                {movie.episode_current}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Progress Bar */}
         {progress !== undefined && (
@@ -58,7 +69,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie, onRemove, progress }) => {
           {movie.name}
         </h3>
         <p className="text-xs text-text-muted mt-1 line-clamp-1">
-          {movie.year} • {movie.origin_name}
+          {[movie.year || null, movie.origin_name].filter(Boolean).join(' • ')}
         </p>
       </div>
     </Link>

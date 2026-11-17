@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight, Tv } from 'lucide-react';
-import { cn, searchMovies, Movie, getImageUrl, GENRES, COUNTRIES, CATEGORIES, formatEpisodeDisplay } from '../services/api';
+import { cn, searchMovies, Movie, getImageUrl, handleImageError, GENRES, COUNTRIES, CATEGORIES, formatEpisodeDisplay } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -54,22 +54,26 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
       return;
     }
 
+    // Bỏ qua kết quả của các lần gõ cũ trả về muộn (tránh hiện sai kết quả)
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
         const data = await searchMovies(searchQuery.trim());
-        if (data.data?.items) {
-          setLiveResults(data.data.items.slice(0, 5));
-          setShowDropdown(true);
-        }
+        if (cancelled) return;
+        setLiveResults((data.data?.items || []).slice(0, 5));
+        setShowDropdown(true);
       } catch (err) {
         console.error('Live search failed:', err);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
-    }, 500);
+    }, 400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -83,7 +87,10 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
 
   const highlightText = (text: string, query: string) => {
     if (!query) return text;
-    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    // Escape ký tự đặc biệt, nếu không gõ "(" hay "+" sẽ làm crash trang
+    const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!escaped) return text;
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
     return parts.map((part, i) => 
       part.toLowerCase() === query.toLowerCase() 
         ? <span key={i} className="text-primary font-black">{part}</span> 
@@ -223,6 +230,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                                     alt={movie.name} 
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                                     referrerPolicy="no-referrer"
+                                    onError={handleImageError}
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -230,8 +238,8 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                                     {highlightText(movie.name, searchQuery)}
                                   </h4>
                                   <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] text-text-muted">{movie.year}</span>
-                                    <span className="text-[10px] px-1.5 py-0.5 bg-white/5 rounded text-text-muted">Phim</span>
+                                    {movie.year > 0 && <span className="text-[10px] text-text-muted">{movie.year}</span>}
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-white/5 rounded text-text-muted truncate">{movie.episode_current || movie.lang || 'Phim'}</span>
                                   </div>
                                 </div>
                               </Link>
@@ -295,7 +303,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                             <div key={item._id} className="p-3 hover:bg-white/5 transition-colors group relative">
                               <Link to={`/movie/${item.slug}`} className="flex gap-3">
                                 <div className="w-20 aspect-video rounded-lg overflow-hidden shrink-0 relative">
-                                  <img src={item.thumb_url} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  <img src={getImageUrl(item.thumb_url || item.poster_url)} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={handleImageError} />
                                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
                                     <div className="h-full bg-primary" style={{ width: `${item.progress}%` }} />
                                   </div>
@@ -430,6 +438,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                                   alt={movie.name}
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"
+                                  onError={handleImageError}
                                 />
                               </div>
                               <div className="flex-1 min-w-0 py-1 text-left">
@@ -437,7 +446,7 @@ export default function Header({ onEnterTvMode }: HeaderProps) {
                                   {highlightText(movie.name, searchQuery)}
                                 </h4>
                                 <p className="text-xs text-text-muted mt-1">
-                                  {movie.year} • {movie.category?.[0]?.name || 'Phim'}
+                                  {[movie.year || null, movie.episode_current || movie.lang || 'Phim'].filter(Boolean).join(' • ')}
                                 </p>
                               </div>
                             </Link>

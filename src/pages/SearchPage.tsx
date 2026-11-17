@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { searchMovies, Movie, cn, fetchMovies, getImageUrl } from '../services/api';
+import { searchMovies, Movie, cn, fetchMovies, getImageUrl, handleImageError } from '../services/api';
 import MovieCard from '../components/MovieCard';
 import { Search as SearchIcon, SlidersHorizontal, Home, Sparkles, AlertCircle } from 'lucide-react';
 
@@ -12,13 +12,19 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [randomMovies, setRandomMovies] = useState<Movie[]>([]);
+
+  // Đổi từ khoá thì quay về trang 1
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
 
   useEffect(() => {
     const loadRandom = async () => {
       try {
         const data = await fetchMovies(Math.floor(Math.random() * 5) + 1);
-        setRandomMovies(data.items.sort(() => 0.5 - Math.random()).slice(0, 6));
+        setRandomMovies([...(data.items || [])].sort(() => 0.5 - Math.random()).slice(0, 6));
       } catch (err) {
         console.error(err);
       }
@@ -27,25 +33,34 @@ export default function SearchPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const performSearch = async () => {
       if (!query) {
         setResults([]);
+        setTotalItems(0);
+        setTotalPages(1);
         setLoading(false);
         return;
       }
       setLoading(true);
       try {
         const data = await searchMovies(query, page);
+        if (cancelled) return;
         setResults(data.data?.items || []);
         setTotalPages(data.data?.params?.pagination?.totalPages || 1);
+        setTotalItems(data.data?.params?.pagination?.totalItems || 0);
       } catch (error) {
         console.error('Search failed:', error);
-        setResults([]);
+        if (!cancelled) setResults([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     performSearch();
+    window.scrollTo(0, 0);
+    return () => {
+      cancelled = true;
+    };
   }, [query, page]);
 
   return (
@@ -54,7 +69,7 @@ export default function SearchPage() {
         <div>
           <h1 className="text-3xl font-black mb-2 text-white">Kết quả tìm kiếm</h1>
           <p className="text-[#B3B3B3] text-sm md:text-base">
-            Tìm thấy <span className="text-primary font-bold">{(results?.length || 0)}</span> kết quả cho từ khóa "<span className="text-primary font-bold">{query}</span>"
+            Tìm thấy <span className="text-primary font-bold">{Math.max(totalItems, results.length)}</span> kết quả cho từ khóa "<span className="text-primary font-bold">{query}</span>"
           </p>
         </div>
 
@@ -124,6 +139,7 @@ export default function SearchPage() {
                       alt={movie.name} 
                       className="w-full h-full object-cover transition-transform group-hover:scale-110"
                       referrerPolicy="no-referrer"
+                      onError={handleImageError}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                       <p className="text-[10px] font-bold text-white line-clamp-2">{movie.name}</p>
@@ -139,18 +155,23 @@ export default function SearchPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-12 gap-2">
-          {[...Array(Math.min(5, totalPages))].map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i + 1)}
-              className={cn(
-                "w-10 h-10 rounded-lg font-bold transition-all",
-                page === i + 1 ? "bg-primary text-white" : "bg-surface hover:bg-primary/20"
-              )}
-            >
-              {i + 1}
-            </button>
-          ))}
+          {(() => {
+            // Cửa sổ 5 trang quanh trang hiện tại (trước đây chỉ bấm được trang 1-5)
+            const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+            const end = Math.min(totalPages, start + 4);
+            return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className={cn(
+                  "w-10 h-10 rounded-lg font-bold transition-all",
+                  page === p ? "bg-primary text-white" : "bg-surface hover:bg-primary/20"
+                )}
+              >
+                {p}
+              </button>
+            ));
+          })()}
         </div>
       )}
     </div>

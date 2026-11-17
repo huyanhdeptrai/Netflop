@@ -25,12 +25,12 @@ export default function MovieDetails() {
       setLoading(true);
       try {
         const data = await fetchMovieDetail(slug);
-        setMovie(data.movie);
-        // The API structure for details usually has movie and episodes
-        if (data.episodes) {
-          setMovie({ ...data.movie, episodes: data.episodes });
-          setSelectedServerIndex(0);
+        if (!data.status) {
+          setMovie(null);
+          return;
         }
+        setMovie({ ...data.movie, episodes: data.episodes || [] });
+        setSelectedServerIndex(0);
 
         // Fetch related movies
         const fetchRelated = async () => {
@@ -103,7 +103,8 @@ export default function MovieDetails() {
   const historyItem = history.find(item => item.slug === slug);
 
   let watchButtonText = "XEM PHIM";
-  let watchLink = `/watch/${movie.slug}${currentServer ? `?ep=${currentServer.server_data[0].slug}&sv=${selectedServerIndex}` : ''}`;
+  const firstEp = currentServer?.server_data?.[0];
+  let watchLink = `/watch/${movie.slug}${firstEp ? `?ep=${firstEp.slug}&sv=${selectedServerIndex}` : ''}`;
 
   if (historyItem) {
     if (historyItem.progress >= 95) {
@@ -112,7 +113,10 @@ export default function MovieDetails() {
       const epName = historyItem.episodeName || '1';
       const displayEp = formatEpisodeDisplay(epName);
       watchButtonText = `TIẾP TỤC XEM: ${displayEp}`;
-      watchLink = `/watch/${movie.slug}?ep=${historyItem.episodeSlug || ''}&sv=${selectedServerIndex}&t=${Math.floor(historyItem.currentTime || 0)}`;
+      const resumeSv = historyItem.serverIndex !== undefined && movie.episodes?.[historyItem.serverIndex]
+        ? historyItem.serverIndex
+        : selectedServerIndex;
+      watchLink = `/watch/${movie.slug}?ep=${historyItem.episodeSlug || ''}&sv=${resumeSv}&t=${Math.floor(historyItem.currentTime || 0)}`;
     }
   }
 
@@ -121,7 +125,7 @@ export default function MovieDetails() {
       {/* Backdrop */}
       <div className="relative h-[40vh] sm:h-[50vh] w-full overflow-hidden">
         <img
-          src={movie.thumb_url}
+          src={getImageUrl(movie.thumb_url || movie.poster_url)}
           alt={movie.name}
           className="w-full h-full object-cover opacity-30 blur-sm"
           referrerPolicy="no-referrer"
@@ -412,6 +416,8 @@ export default function MovieDetails() {
                       alt={m.name} 
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      onError={handleImageError}
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(229,9,127,0.5)]">

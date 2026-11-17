@@ -20,7 +20,8 @@ export default function Watch() {
   const [showControls, setShowControls] = useState(true);
   const { updateHistory, history } = useHistory();
   const progressRef = useRef<number>(0);
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedSlugRef = useRef<string | null>(null);
 
   const currentServer = movie?.episodes?.[currentSvIndex] || movie?.episodes?.[0];
   const activeServerGroup = currentServer?.server_group || 'Server 1';
@@ -61,11 +62,18 @@ export default function Watch() {
   useEffect(() => {
     const loadDetail = async () => {
       if (!slug) return;
-      setLoading(true);
+      // Chỉ hiện skeleton khi đổi phim, đổi tập/server thì không nháy lại cả trang
+      const isNewMovie = loadedSlugRef.current !== slug;
+      if (isNewMovie) setLoading(true);
       try {
         const data = await fetchMovieDetail(slug);
+        if (!data.status) {
+          setMovie(null);
+          return;
+        }
         const movieData = { ...data.movie, episodes: data.episodes };
         setMovie(movieData);
+        loadedSlugRef.current = slug;
         
         // Select episode and server
         if (movieData.episodes && movieData.episodes.length > 0) {
@@ -143,7 +151,7 @@ export default function Watch() {
             }
           };
 
-          fetchRelated();
+          if (isNewMovie) fetchRelated();
         }
       } catch (error) {
         console.error('Failed to fetch movie detail:', error);
@@ -154,6 +162,11 @@ export default function Watch() {
     loadDetail();
     window.scrollTo(0, 0);
   }, [slug, currentEpSlug, currentSvIndex]);
+
+  // Đổi phim thì xoá danh sách đề xuất cũ
+  useEffect(() => {
+    setRelatedMovies([]);
+  }, [slug]);
 
   // Helper to parse duration string (e.g., "45 phút", "120 phút", "2 giờ")
   const parseDuration = (timeStr: string): number => {
@@ -174,10 +187,16 @@ export default function Watch() {
     const saveProgress = () => {
       const duration = parseDuration(movie.time);
       const progress = Math.min(100, (progressRef.current / duration) * 100);
-      const server = movie.episodes?.[currentSvIndex];
+      const svIdx = movie.episodes?.[currentSvIndex] ? currentSvIndex : 0;
+      const server = movie.episodes?.[svIdx];
+      const list = server?.server_data || [];
+      const idx = list.findIndex((ep) => ep.slug === currentEpisode.slug);
+      const next = idx !== -1 ? list[idx + 1] : undefined;
 
       updateHistory({
         ...movie,
+        serverIndex: svIdx,
+        nextEpisode: next ? { slug: next.slug, name: next.name } : null,
         currentTime: progressRef.current,
         duration: duration,
         progress: progress,
@@ -186,7 +205,6 @@ export default function Watch() {
         episodeName: currentEpisode.name,
         serverName: server?.server_name,
         isSeries: movie.type === 'series' || (movie.episodes?.[0]?.server_data?.length || 0) > 1,
-        episodes: movie.episodes
       });
     };
 

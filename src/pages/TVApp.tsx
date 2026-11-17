@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, Film, Tv, Heart, LogOut, Play, Star, Calendar, Clock, Globe, ArrowLeft, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies, formatEpisodeDisplay, cleanEpisodeName } from '../services/api';
+import { fetchMovies, fetchCategoryMovies, fetchMovieDetail, getImageUrl, handleImageError, Movie, MovieDetail, fetchGenreMovies, fetchCountryMovies, GENRES, COUNTRIES, searchMovies, formatEpisodeDisplay, cleanEpisodeName, slugify } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import '../tv.css';
 
@@ -749,6 +749,10 @@ export default function TVApp({ setTvMode }: TVAppProps) {
     setCurrentSection('player');
 
     if (selectedMovie) {
+      const list = selectedMovie.episodes?.[selectedServerIdx]?.server_data || [];
+      const epIdx = list.findIndex((ep) => ep.link_embed === embedUrl || ep.name === epName);
+      const ep = epIdx !== -1 ? list[epIdx] : undefined;
+      const next = epIdx !== -1 ? list[epIdx + 1] : undefined;
       updateHistory({
         _id: selectedMovie._id,
         name: selectedMovie.name,
@@ -763,9 +767,11 @@ export default function TVApp({ setTvMode }: TVAppProps) {
         progress: 35, // default starter progress for history row
         lastUpdated: Date.now(),
         episodeName: epName,
-        episodeSlug: epName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        isSeries: selectedMovie.type === 'series',
-        episodes: selectedMovie.episodes,
+        episodeSlug: ep?.slug || slugify(epName),
+        serverIndex: selectedServerIdx,
+        serverName: selectedMovie.episodes?.[selectedServerIdx]?.server_name,
+        nextEpisode: next ? { slug: next.slug, name: next.name } : null,
+        isSeries: selectedMovie.type === 'series' || list.length > 1,
       });
     }
   };
