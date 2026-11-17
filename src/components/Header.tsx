@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight, Tv } from 'lucide-react';
+import { Search, Heart, User, Menu, X, History, Trash2, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { cn, searchMovies, Movie, getImageUrl, handleImageError, GENRES, COUNTRIES, CATEGORIES, formatEpisodeDisplay } from '../services/api';
 import { useHistory } from '../services/HistoryContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-interface HeaderProps {
-  onEnterTvMode?: () => void;
-}
-
-export default function Header({ onEnterTvMode }: HeaderProps) {
+export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);

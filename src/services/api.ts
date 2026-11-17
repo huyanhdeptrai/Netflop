@@ -10,14 +10,16 @@ export function cn(...inputs: ClassValue[]) {
 /*  Nguồn dữ liệu                                                      */
 /*  - Server 1 (chính): KKPhim  https://phimapi.com                    */
 /*  - Server 2 (phụ):   NguonC  https://phim.nguonc.com/api            */
+/*  - Server 3 (phụ):   VSMov   https://vsmov.com/api                  */
 /* ------------------------------------------------------------------ */
 
 export const API_BASE_URL = 'https://phimapi.com';
 export const NGUONC_BASE_URL = 'https://phim.nguonc.com/api';
+export const VSMOV_BASE_URL = 'https://vsmov.com/api';
 // CDN ảnh chính thức của KKPhim (img.phimapi.com đã chết, trả 404)
 const KK_IMAGE_CDN = 'https://phimimg.com';
 
-export type MovieSource = 'kkphim' | 'nguonc';
+export type MovieSource = 'kkphim' | 'nguonc' | 'vsmov';
 
 export interface TmdbInfo {
   id?: string | number | null;
@@ -221,13 +223,20 @@ export function isSameFilm(a: FilmRef, b: FilmRef): boolean {
     if (aType && bType && aType !== bType) return false;
     const aSeason = a.tmdb?.season ?? null;
     const bSeason = b.tmdb?.season ?? null;
-    if (aSeason !== null && bSeason !== null && Number(aSeason) !== Number(bSeason)) return false;
-    return true;
+    if (aSeason !== null && bSeason !== null) return Number(aSeason) === Number(bSeason);
+    // Một bên không ghi phần (VSMov hay để null): phim lẻ thì coi là trùng,
+    // phim bộ phần >1 thì phải khớp thêm tên để không gộp nhầm Phần 1 với Phần 2
+    const known = aSeason ?? bSeason;
+    if (known === null || Number(known) <= 1) return true;
+    return titlesMatch(a, b);
   }
 
   const yearOk = !a.year || !b.year || Math.abs(a.year - b.year) <= 1;
   if (!yearOk) return false;
+  return titlesMatch(a, b);
+}
 
+function titlesMatch(a: FilmRef, b: FilmRef): boolean {
   const aOrigin = normalizeTitle(a.origin_name);
   const bOrigin = normalizeTitle(b.origin_name);
   const aName = normalizeTitle(a.name);
@@ -251,6 +260,25 @@ const mapNguoncItem = (item: any): Movie => ({
   episode_current: item.current_episode || undefined,
   tmdb: item.tmdb ? { id: item.tmdb.id, type: item.tmdb.type, season: item.tmdb.season } : undefined,
   source: 'nguonc',
+});
+
+/** Map 1 item danh sách/tìm kiếm của VSMov (định dạng giống KKPhim nhưng ảnh đặt ngược) */
+const mapVsmovItem = (item: any): Movie => ({
+  _id: `vs-${item.slug}`,
+  name: item.name,
+  slug: item.slug,
+  origin_name: item.origin_name || item.name,
+  // VSMov: thumb_url là ảnh dọc, poster_url là ảnh ngang
+  poster_url: item.thumb_url || item.poster_url || '',
+  thumb_url: item.poster_url || item.thumb_url || '',
+  year: toYear(item.year),
+  modified: { time: item.modified?.time || '' },
+  type: item.type || undefined,
+  lang: item.lang || undefined,
+  quality: item.quality || undefined,
+  episode_current: item.episode_current || undefined,
+  tmdb: item.tmdb ? { id: item.tmdb.id, type: item.tmdb.type, season: item.tmdb.season } : undefined,
+  source: 'vsmov',
 });
 
 const withKkSource = (items: any[]): Movie[] =>
@@ -326,12 +354,27 @@ const NGUONC_CATEGORY_MAP: Record<string, string> = {
   'phim-bo-dang-chieu': 'phim-dang-chieu',
 };
 
-async function listWithFallback(kkUrl: string, ncUrl: string | null, page: number) {
+const vsmovListToResult = (res: any, page: number): ListResult | null => {
+  if (!res?.status || !Array.isArray(res.items) || res.items.length === 0) return null;
+  const p = res.pagination || {};
+  return makeListResult(res.items.map(mapVsmovItem), {
+    totalItems: p.totalItems,
+    totalItemsPerPage: p.totalItemsPerPage,
+    currentPage: p.currentPage || page,
+    totalPages: p.totalPages,
+  });
+};
+
+async function listWithFallback(kkUrl: string, ncUrl: string | null, page: number, vsUrl: string | null = null) {
   const kk = kkListToResult(await getJSON(kkUrl), page);
   if (kk) return kk;
   if (ncUrl) {
     const nc = nguoncListToResult(await getJSON(ncUrl), page);
     if (nc) return nc;
+  }
+  if (vsUrl) {
+    const vs = vsmovListToResult(await getJSON(vsUrl), page);
+    if (vs) return vs;
   }
   return emptyList(page);
 }
@@ -340,7 +383,8 @@ export const fetchMovies = (page = 1) =>
   listWithFallback(
     `${API_BASE_URL}/danh-sach/phim-moi-cap-nhat?page=${page}`,
     `${NGUONC_BASE_URL}/films/phim-moi-cap-nhat?page=${page}`,
-    page
+    page,
+    `${VSMOV_BASE_URL}/danh-sach/phim-moi-cap-nhat?page=${page}`
   );
 
 export const fetchMoviesV1 = (page = 1) =>
@@ -379,10 +423,16 @@ export const fetchGenresList = () => getJSON(`${API_BASE_URL}/v1/api/the-loai`, 
 export const fetchCountriesList = () => getJSON(`${API_BASE_URL}/v1/api/quoc-gia`, { ttl: 60 * 60 * 1000 });
 
 /* ------------------------------------------------------------------ */
-/*  Tìm kiếm: gộp 2 nguồn, KKPhim đứng trước, bỏ phim trùng             */
+/*  Tìm kiếm: gộp 3 nguồn theo thứ tự ưu tiên, bỏ phim trùng            */
 /* ------------------------------------------------------------------ */
 
-const searchKk = async (keyword: string, page: number, limit: number) => {
+interface SearchPage {
+  items: Movie[];
+  totalItems: number;
+  totalPages: number;
+}
+
+const searchKk = async (keyword: string, page: number, limit: number): Promise<SearchPage> => {
   const res = await getJSON(
     `${API_BASE_URL}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}&limit=${limit}`
   );
@@ -391,7 +441,7 @@ const searchKk = async (keyword: string, page: number, limit: number) => {
   return { items, totalItems: Number(p.totalItems) || items.length, totalPages: Number(p.totalPages) || 1 };
 };
 
-const searchNguonc = async (keyword: string, page: number) => {
+const searchNguonc = async (keyword: string, page: number): Promise<SearchPage> => {
   const res = await getJSON(
     `${NGUONC_BASE_URL}/films/search?keyword=${encodeURIComponent(keyword)}&page=${page}`
   );
@@ -403,27 +453,49 @@ const searchNguonc = async (keyword: string, page: number) => {
   };
 };
 
+const searchVsmov = async (keyword: string, page: number, limit: number): Promise<SearchPage> => {
+  const res = await getJSON(
+    `${VSMOV_BASE_URL}/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}&limit=${limit}`
+  );
+  const items: Movie[] = res?.status && Array.isArray(res.items) ? res.items.map(mapVsmovItem) : [];
+  return {
+    items,
+    totalItems: Number(res?.pagination?.totalItems) || items.length,
+    totalPages: Number(res?.pagination?.totalPages) || 1,
+  };
+};
+
 export const searchMovies = async (keyword: string, page = 1, limit = 24) => {
   const cleanKeyword = keyword.trim();
   if (!cleanKeyword) return emptyList(page);
 
-  const [kk, nc] = await Promise.all([searchKk(cleanKeyword, page, limit), searchNguonc(cleanKeyword, page)]);
+  // Thứ tự = thứ tự ưu tiên: KKPhim -> NguonC -> VSMov
+  const pages = await Promise.all([
+    searchKk(cleanKeyword, page, limit),
+    searchNguonc(cleanKeyword, page),
+    searchVsmov(cleanKeyword, page, limit),
+  ]);
 
-  const ncOnly = nc.items.filter((n) => !kk.items.some((k) => k.slug === n.slug || isSameFilm(k, n)));
-  const duplicates = nc.items.length - ncOnly.length;
-  const items = [...kk.items, ...ncOnly];
+  const items: Movie[] = [];
+  let duplicates = 0;
+  for (const p of pages) {
+    for (const m of p.items) {
+      if (items.some((x) => x.slug === m.slug || isSameFilm(x, m))) duplicates++;
+      else items.push(m);
+    }
+  }
 
   return makeListResult(items, {
-    // Số tổng là ước lượng: tổng 2 nguồn trừ số phim trùng thấy được ở trang hiện tại
-    totalItems: Math.max(items.length, kk.totalItems + nc.totalItems - duplicates),
+    // Số tổng là ước lượng: tổng các nguồn trừ số phim trùng thấy được ở trang hiện tại
+    totalItems: Math.max(items.length, pages.reduce((s, p) => s + p.totalItems, 0) - duplicates),
     totalItemsPerPage: limit,
     currentPage: page,
-    totalPages: Math.max(kk.totalPages, nc.totalPages, 1),
+    totalPages: Math.max(1, ...pages.map((p) => p.totalPages)),
   });
 };
 
 /* ------------------------------------------------------------------ */
-/*  Chi tiết phim: gộp KKPhim (Server 1) + NguonC (Server 2)           */
+/*  Chi tiết phim: KKPhim (Server 1) + NguonC (Server 2) + VSMov (3)   */
 /* ------------------------------------------------------------------ */
 
 const DETAIL_TTL = 10 * 60 * 1000;
@@ -434,26 +506,30 @@ const cleanAudioLabel = (name: string) => {
   const inParens = name.match(/\(([^)]+)\)/);
   let clean = (inParens ? inParens[1] : name)
     .replace(/Server\s*\d+/gi, '')
-    .replace(/KKPhim|NguonC/gi, '')
+    .replace(/KKPhim|NguonC|VSMov/gi, '')
     .replace(/#\s*\d+/g, '')
     .replace(/[#\-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (!clean || clean.length < 2) return 'Bản chuẩn';
-  // Thống nhất kiểu chữ giữa 2 nguồn: "Thuyết Minh" / "thuyết minh" -> "Thuyết minh"
-  clean = clean.toLocaleLowerCase('vi');
+  // Thống nhất kiểu chữ giữa các nguồn: "Thuyết Minh" / "thuyết minh" -> "Thuyết minh"
+  // "Vietsub A.I" -> "Vietsub AI" (chỉ khi "ai" đứng riêng thành 1 từ)
+  clean = clean.toLocaleLowerCase('vi').replace(/(^|\s)a\.?\s?i\.?(?=\s|$)/g, '$1AI');
   return clean.charAt(0).toLocaleUpperCase('vi') + clean.slice(1);
 };
 
-const parseKkEpisodes = (episodes: any[]): Omit<EpisodeServer, 'server_group'>[] =>
+type ServerWithoutGroup = Omit<EpisodeServer, 'server_group'>;
+
+/** Định dạng tập kiểu KKPhim/VSMov: [{ server_name, server_data: [{ link_embed, link_m3u8 }] }] */
+const parseKkStyleEpisodes = (episodes: any[], source: MovieSource): ServerWithoutGroup[] =>
   (episodes || [])
     .map((srv: any) => ({
       server_name: cleanAudioLabel(srv.server_name),
-      source: 'kkphim' as const,
+      source,
       server_data: (srv.server_data || [])
         .filter((ep: any) => ep && (ep.link_embed || ep.link_m3u8))
         .map((ep: any) => ({
-          name: String(ep.name ?? ''),
+          name: String(ep.name ?? '').trim(),
           slug: ep.slug || slugify(`tap-${ep.name}`),
           filename: ep.filename || '',
           link_embed: ep.link_embed || '',
@@ -462,7 +538,7 @@ const parseKkEpisodes = (episodes: any[]): Omit<EpisodeServer, 'server_group'>[]
     }))
     .filter((srv) => srv.server_data.length > 0);
 
-const parseNguoncEpisodes = (episodes: any[]): Omit<EpisodeServer, 'server_group'>[] =>
+const parseNguoncEpisodes = (episodes: any[]): ServerWithoutGroup[] =>
   (episodes || [])
     .map((srv: any) => ({
       server_name: cleanAudioLabel(srv.server_name),
@@ -470,7 +546,7 @@ const parseNguoncEpisodes = (episodes: any[]): Omit<EpisodeServer, 'server_group
       server_data: (srv.items || [])
         .filter((ep: any) => ep && (ep.embed || ep.m3u8))
         .map((ep: any) => ({
-          name: String(ep.name ?? ''),
+          name: String(ep.name ?? '').trim(),
           slug: ep.slug || slugify(`tap-${ep.name}`),
           filename: ep.name || '',
           link_embed: ep.embed || '',
@@ -480,7 +556,7 @@ const parseNguoncEpisodes = (episodes: any[]): Omit<EpisodeServer, 'server_group
     .filter((srv) => srv.server_data.length > 0);
 
 /** Đánh tên định dạng trùng trong cùng 1 server: Vietsub, Vietsub 2... */
-const dedupeLabels = (servers: Omit<EpisodeServer, 'server_group'>[]) => {
+const dedupeLabels = (servers: ServerWithoutGroup[]) => {
   const seen = new Map<string, number>();
   return servers.map((srv) => {
     const count = (seen.get(srv.server_name) || 0) + 1;
@@ -507,7 +583,9 @@ const parseNguoncMeta = (m: any) => {
   return { categories, countries, format };
 };
 
-const mapNguoncDetail = (m: any): Omit<MovieDetail, 'episodes'> => {
+type MovieInfo = Omit<MovieDetail, 'episodes'>;
+
+const mapNguoncDetail = (m: any): MovieInfo => {
   const { categories, countries, format } = parseNguoncMeta(m);
   const f = slugify(format);
   const isAnimation = categories.some((c) => c.slug === 'hoat-hinh');
@@ -536,48 +614,100 @@ const mapNguoncDetail = (m: any): Omit<MovieDetail, 'episodes'> => {
   };
 };
 
-const fetchKkDetailRaw = async (slug: string) => {
-  const res = await getJSON(`${API_BASE_URL}/phim/${encodeURIComponent(slug)}`, { ttl: DETAIL_TTL });
-  return (res?.status === true || res?.status === 'success') && res?.movie ? res : null;
-};
-
-const fetchNguoncDetailRaw = async (slug: string) => {
-  const res = await getJSON(`${NGUONC_BASE_URL}/film/${encodeURIComponent(slug)}`, { ttl: DETAIL_TTL });
-  return res?.status === 'success' && res?.movie ? res.movie : null;
-};
-
-const kkRef = (kk: any): FilmRef => ({
-  name: kk.movie.name,
-  origin_name: kk.movie.origin_name,
-  year: toYear(kk.movie.year),
-  tmdb: kk.movie.tmdb,
+const mapVsmovDetail = (m: any): MovieInfo => ({
+  ...m,
+  ...mapVsmovItem(m),
+  content: m.content || '',
+  type: m.type || 'single',
+  status: m.status || '',
+  // VSMov có lúc trả "86" thay vì "86 phút"
+  time: /^\d+$/.test(String(m.time || '').trim()) ? `${String(m.time).trim()} phút` : m.time || '',
+  episode_current: m.episode_current || '',
+  episode_total: m.episode_total ? String(m.episode_total) : '',
+  quality: m.quality || 'HD',
+  lang: m.lang || 'Vietsub',
+  notify: m.notify || '',
+  showtimes: m.showtimes || '',
+  actor: splitList(m.actor),
+  director: splitList(m.director),
+  category: Array.isArray(m.category) ? m.category.map((c: any) => ({ ...c, id: String(c.id) })) : [],
+  country: Array.isArray(m.country) ? m.country.map((c: any) => ({ ...c, id: String(c.id) })) : [],
 });
 
-const ncRef = (nc: any): FilmRef => ({
-  name: nc.name,
-  origin_name: nc.original_name,
-  year: toYear(nc.year),
-  tmdb: nc.tmdb,
-});
-
-/** Tìm phim tương ứng bên NguonC khi slug 2 bên khác nhau */
-async function findOnNguonc(ref: FilmRef) {
-  const keywords = Array.from(new Set([ref.name, ref.origin_name].filter(Boolean)));
-  for (const kw of keywords) {
-    const { items } = await searchNguonc(kw, 1);
-    const match = items.find((it) => isSameFilm(ref, it));
-    if (match) return fetchNguoncDetailRaw(match.slug);
-  }
-  return null;
+/** Kết quả chuẩn hoá của 1 nguồn cho 1 phim */
+interface SourceDetail {
+  source: MovieSource;
+  ref: FilmRef;
+  movie: MovieInfo;
+  servers: ServerWithoutGroup[];
 }
 
-/** Tìm phim tương ứng bên KKPhim khi slug 2 bên khác nhau */
-async function findOnKk(ref: FilmRef) {
+const fetchKkDetail = async (slug: string): Promise<SourceDetail | null> => {
+  const res = await getJSON(`${API_BASE_URL}/phim/${encodeURIComponent(slug)}`, { ttl: DETAIL_TTL });
+  if (!((res?.status === true || res?.status === 'success') && res?.movie)) return null;
+  const m = res.movie;
+  const movie: MovieInfo = {
+    ...m,
+    year: toYear(m.year),
+    actor: splitList(m.actor),
+    director: splitList(m.director),
+    category: m.category || [],
+    country: m.country || [],
+    source: 'kkphim',
+  };
+  return {
+    source: 'kkphim',
+    ref: { name: m.name, origin_name: m.origin_name, year: toYear(m.year), tmdb: m.tmdb },
+    movie,
+    servers: parseKkStyleEpisodes(res.episodes, 'kkphim'),
+  };
+};
+
+const fetchNguoncDetail = async (slug: string): Promise<SourceDetail | null> => {
+  const res = await getJSON(`${NGUONC_BASE_URL}/film/${encodeURIComponent(slug)}`, { ttl: DETAIL_TTL });
+  if (!(res?.status === 'success' && res?.movie)) return null;
+  const m = res.movie;
+  return {
+    source: 'nguonc',
+    ref: { name: m.name, origin_name: m.original_name, year: toYear(m.year), tmdb: m.tmdb },
+    movie: mapNguoncDetail(m),
+    servers: parseNguoncEpisodes(m.episodes),
+  };
+};
+
+const fetchVsmovDetail = async (slug: string): Promise<SourceDetail | null> => {
+  const res = await getJSON(`${VSMOV_BASE_URL}/phim/${encodeURIComponent(slug)}`, { ttl: DETAIL_TTL });
+  if (!(res?.status && res?.movie)) return null;
+  const m = res.movie;
+  return {
+    source: 'vsmov',
+    ref: { name: m.name, origin_name: m.origin_name, year: toYear(m.year), tmdb: m.tmdb },
+    movie: mapVsmovDetail(m),
+    servers: parseKkStyleEpisodes(res.episodes, 'vsmov'),
+  };
+};
+
+/** Cấu hình từng nguồn, theo đúng thứ tự Server 1, 2, 3 */
+const SOURCES: {
+  id: MovieSource;
+  detail: (slug: string) => Promise<SourceDetail | null>;
+  search: (keyword: string) => Promise<SearchPage>;
+}[] = [
+  { id: 'kkphim', detail: fetchKkDetail, search: (kw) => searchKk(kw, 1, 20) },
+  { id: 'nguonc', detail: fetchNguoncDetail, search: (kw) => searchNguonc(kw, 1) },
+  { id: 'vsmov', detail: fetchVsmovDetail, search: (kw) => searchVsmov(kw, 1, 20) },
+];
+
+/** Khi slug khác nhau giữa các nguồn: tìm theo tên rồi khớp TMDB / tên gốc + năm */
+async function findBySearch(src: (typeof SOURCES)[number], ref: FilmRef): Promise<SourceDetail | null> {
   const keywords = Array.from(new Set([ref.name, ref.origin_name].filter(Boolean)));
   for (const kw of keywords) {
-    const { items } = await searchKk(kw, 1, 20);
+    const { items } = await src.search(kw);
     const match = items.find((it) => isSameFilm(ref, it));
-    if (match) return fetchKkDetailRaw(match.slug);
+    if (match) {
+      const detail = await src.detail(match.slug);
+      if (detail && isSameFilm(ref, detail.ref)) return detail;
+    }
   }
   return null;
 }
@@ -600,38 +730,38 @@ type DetailResult =
 const detailCache = new Map<string, { expires: number; promise: Promise<DetailResult> }>();
 
 async function loadMovieDetail(slug: string): Promise<DetailResult> {
-  let [kk, nc] = await Promise.all([fetchKkDetailRaw(slug), fetchNguoncDetailRaw(slug)]);
+  // 1. Gọi cả 3 nguồn theo slug cùng lúc
+  const bySlug = await Promise.all(SOURCES.map((s) => s.detail(slug)));
 
-  // Trùng slug nhưng khác phim -> bỏ bản NguonC, đi tìm lại theo tên
-  if (kk && nc && !isSameFilm(kkRef(kk), ncRef(nc))) nc = null;
+  // 2. Phim "gốc" = nguồn ưu tiên cao nhất có slug này
+  const anchor = bySlug.find(Boolean);
+  if (!anchor) return { status: false, msg: 'Không tìm thấy phim' };
 
-  if (kk && !nc) nc = await findOnNguonc(kkRef(kk));
-  else if (!kk && nc) kk = await findOnKk(ncRef(nc));
+  // 3. Nguồn nào trùng slug nhưng khác phim thì bỏ; nguồn nào thiếu thì tìm theo tên
+  const details = await Promise.all(
+    SOURCES.map(async (src, i) => {
+      const d = bySlug[i];
+      if (d === anchor) return d;
+      if (d && isSameFilm(anchor.ref, d.ref)) return d;
+      return findBySearch(src, anchor.ref);
+    })
+  );
+  const found = details.filter((d): d is SourceDetail => !!d);
 
-  if (!kk && !nc) return { status: false, msg: 'Không tìm thấy phim' };
-
-  const ncMovie = nc ? mapNguoncDetail(nc) : null;
-  let movie: Omit<MovieDetail, 'episodes'>;
-  if (kk) {
-    movie = { ...kk.movie, year: toYear(kk.movie.year), source: 'kkphim' as const };
-    if (ncMovie) {
-      const { _id, slug: _s, source: _src, poster_url, thumb_url, ...rest } = ncMovie;
-      movie = fillMissing(movie, rest);
-      if (!movie.poster_url) movie.poster_url = poster_url;
-      if (!movie.thumb_url) movie.thumb_url = thumb_url;
-    }
-  } else {
-    movie = ncMovie!;
+  // 4. Thông tin phim lấy theo nguồn ưu tiên cao nhất, chỗ trống lấy từ nguồn sau
+  const [primary, ...rest] = found;
+  let movie: MovieInfo = primary.movie;
+  for (const d of rest) {
+    const { _id, slug: _s, source: _src, poster_url, thumb_url, ...info } = d.movie;
+    movie = fillMissing(movie, info);
+    if (!movie.poster_url) movie.poster_url = poster_url;
+    if (!movie.thumb_url) movie.thumb_url = thumb_url;
   }
   // Giữ đúng slug người dùng truy cập để URL / lịch sử / yêu thích ổn định
   movie = { ...movie, slug };
 
-  // KKPhim luôn đứng trước -> chỉ số `sv` trên URL ổn định
-  const groups = [
-    kk ? dedupeLabels(parseKkEpisodes(kk.episodes)) : [],
-    nc ? dedupeLabels(parseNguoncEpisodes(nc.episodes)) : [],
-  ].filter((g) => g.length > 0);
-
+  // 5. Server đánh số theo thứ tự nguồn (KKPhim luôn trước) -> chỉ số `sv` trên URL ổn định
+  const groups = found.map((d) => dedupeLabels(d.servers)).filter((g) => g.length > 0);
   const episodes: EpisodeServer[] = groups.flatMap((group, i) =>
     group.map((srv) => ({ ...srv, server_group: `Server ${i + 1}` }))
   );
